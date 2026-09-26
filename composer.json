@@ -1,8 +1,14 @@
 {
-  "name": "jgcansi/vitalheart-php",
-  "description": "Lightweight observability and telemetry for PHP applications.",
+  "name": "jgcansi/pulse-php",
+  "description": "Biblioteca leve de observabilidade, monitoramento e telemetria para PHP e Laravel.",
   "type": "library",
   "license": "MIT",
+  "authors": [
+    {
+      "name": "João Gabriel Cansi Silveira",
+      "role": "Developer"
+    }
+  ],
   "require": {
     "php": ">=8.1",
     "ext-pdo": "*",
