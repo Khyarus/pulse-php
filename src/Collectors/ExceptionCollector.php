@@ -25,7 +25,7 @@ final class ExceptionCollector
 
     public function handleException(Throwable $exception): void
     {
-        $this->pulse->recordException($exception);
+        $this->pulse->recordException($exception, true);
 
         if (is_callable($this->previousExceptionHandler)) {
             ($this->previousExceptionHandler)($exception);

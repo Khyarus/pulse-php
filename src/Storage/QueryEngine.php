@@ -5,6 +5,9 @@ declare(strict_types=1);
 namespace PulsePHP\Storage;
 
 use PDO;
+use DateTimeImmutable;
+use DateTimeZone;
+use InvalidArgumentException;
 use RuntimeException;
 
 final class QueryEngine
@@ -286,6 +289,144 @@ final class QueryEngine
         return array_map('strval', $statement->fetchAll(PDO::FETCH_COLUMN));
     }
 
+    /**
+     * @return list<array{
+     *     service: string,
+     *     route: string,
+     *     method: string,
+     *     total_requests: int,
+     *     avg_duration_ms: float,
+     *     error_rate_percent: float,
+     *     unhandled_exceptions: int,
+     *     timeline: list<array{timestamp: string, requests: int, avg_duration_ms: float}>
+     * }>
+     */
+    public function getMetricsByRoute(string $from, string $to, ?string $service = null): array
+    {
+        $from = $this->normalizeDateTime($from);
+        $to = $this->normalizeDateTime($to);
+        $parameters = [':from' => $from, ':to' => $to];
+        $serviceRequestFilter = '';
+        $serviceExceptionFilter = '';
+        if ($service !== null && $service !== '') {
+            $serviceRequestFilter = ' AND requests.service = :request_service';
+            $serviceExceptionFilter = ' AND exceptions.service = :exception_service';
+            $parameters[':request_service'] = $service;
+            $parameters[':exception_service'] = $service;
+        }
+
+        $summary = $this->pdo->prepare(
+            'SELECT requests.service, requests.route, requests.method,
+                    COUNT(*) AS total_requests,
+                    AVG(requests.duration_ms) AS avg_duration_ms,
+                    100.0 * SUM(CASE WHEN requests.status_code >= 400 THEN 1 ELSE 0 END) / COUNT(*) AS error_rate_percent,
+                    COALESCE(unhandled.count, 0) AS unhandled_exceptions
+             FROM pulse_requests AS requests
+             LEFT JOIN (
+                 SELECT service, route, method, COUNT(*) AS count
+                 FROM pulse_exceptions AS exceptions
+                 WHERE exceptions.unhandled = 1
+                   AND exceptions.created_at >= :exception_from
+                   AND exceptions.created_at <= :exception_to' . $serviceExceptionFilter . '
+                 GROUP BY service, route, method
+             ) AS unhandled
+               ON unhandled.service = requests.service
+              AND unhandled.route = requests.route
+              AND (unhandled.method = requests.method OR unhandled.method = \'\')
+             WHERE requests.created_at >= :from
+               AND requests.created_at <= :to' . $serviceRequestFilter . '
+             GROUP BY requests.service, requests.route, requests.method
+             ORDER BY total_requests DESC, requests.route, requests.method'
+        );
+        $summaryParameters = $parameters + [':exception_from' => $from, ':exception_to' => $to];
+        $summary->execute($summaryParameters);
+        $rows = $summary->fetchAll();
+
+        $bucketFormat = $this->routeBucketFormat($from, $to);
+        $timeline = $this->pdo->prepare(
+            'SELECT service, route, method, strftime(:bucket_format, created_at) AS bucket,
+                    COUNT(*) AS requests, AVG(duration_ms) AS avg_duration_ms
+             FROM pulse_requests
+             WHERE created_at >= :from AND created_at <= :to'
+            . ($service !== null && $service !== '' ? ' AND service = :service' : '') . '
+             GROUP BY service, route, method, bucket
+             ORDER BY bucket'
+        );
+        $timelineParameters = [
+            ':bucket_format' => $bucketFormat,
+            ':from' => $from,
+            ':to' => $to,
+        ];
+        if ($service !== null && $service !== '') {
+            $timelineParameters[':service'] = $service;
+        }
+        $timeline->execute($timelineParameters);
+
+        $seriesByRoute = [];
+        foreach ($timeline->fetchAll() as $point) {
+            $key = json_encode(
+                [$point['service'], $point['route'], $point['method']],
+                JSON_THROW_ON_ERROR
+            );
+            $seriesByRoute[$key][] = [
+                'timestamp' => (string) $point['bucket'],
+                'requests' => (int) $point['requests'],
+                'avg_duration_ms' => (float) $point['avg_duration_ms'],
+            ];
+        }
+
+        return array_map(static function (array $row) use ($seriesByRoute): array {
+            $key = json_encode(
+                [$row['service'], $row['route'], $row['method']],
+                JSON_THROW_ON_ERROR
+            );
+
+            return [
+                'service' => (string) $row['service'],
+                'route' => (string) $row['route'],
+                'method' => (string) $row['method'],
+                'total_requests' => (int) $row['total_requests'],
+                'avg_duration_ms' => (float) $row['avg_duration_ms'],
+                'error_rate_percent' => (float) $row['error_rate_percent'],
+                'unhandled_exceptions' => (int) $row['unhandled_exceptions'],
+                'timeline' => $seriesByRoute[$key] ?? [],
+            ];
+        }, $rows);
+    }
+
+    /** @return list<array{url: string, status_code: int, duration_ms: float, created_at: string}> */
+    public function getSlowestRequestsByRoute(
+        string $from,
+        string $to,
+        string $service,
+        string $route,
+        string $method,
+        int $limit = 5
+    ): array {
+        $statement = $this->pdo->prepare(
+            'SELECT url, status_code, duration_ms, created_at
+             FROM pulse_requests
+             WHERE created_at >= :from AND created_at <= :to
+               AND service = :service AND route = :route AND method = :method
+             ORDER BY duration_ms DESC, created_at DESC
+             LIMIT :limit'
+        );
+        $statement->bindValue(':from', $this->normalizeDateTime($from));
+        $statement->bindValue(':to', $this->normalizeDateTime($to));
+        $statement->bindValue(':service', $service);
+        $statement->bindValue(':route', $route);
+        $statement->bindValue(':method', $method);
+        $statement->bindValue(':limit', $this->normalizeLimit($limit), PDO::PARAM_INT);
+        $statement->execute();
+
+        return array_map(static fn (array $row): array => [
+            'url' => (string) $row['url'],
+            'status_code' => (int) $row['status_code'],
+            'duration_ms' => (float) $row['duration_ms'],
+            'created_at' => (string) $row['created_at'],
+        ], $statement->fetchAll());
+    }
+
     /** @return list<array{minute: string, count: int}> */
     private function getTimeline(
         string $table,
@@ -391,6 +532,32 @@ final class QueryEngine
             '7d' => '%Y-%m-%d 00:00:00',
             default => '%Y-%m-%d %H:%M:00',
         };
+    }
+
+    private function normalizeDateTime(string $value): string
+    {
+        try {
+            return (new DateTimeImmutable($value, new DateTimeZone('UTC')))
+                ->setTimezone(new DateTimeZone('UTC'))
+                ->format('Y-m-d H:i:s');
+        } catch (\Exception $exception) {
+            throw new InvalidArgumentException('Date filters must be valid date/time values.', 0, $exception);
+        }
+    }
+
+    private function routeBucketFormat(string $from, string $to): string
+    {
+        $rangeSeconds = (new DateTimeImmutable($to, new DateTimeZone('UTC')))->getTimestamp()
+            - (new DateTimeImmutable($from, new DateTimeZone('UTC')))->getTimestamp();
+
+        if ($rangeSeconds <= 3 * 60 * 60) {
+            return '%Y-%m-%d %H:%M:00';
+        }
+        if ($rangeSeconds <= 2 * 24 * 60 * 60) {
+            return '%Y-%m-%d %H:00:00';
+        }
+
+        return '%Y-%m-%d 00:00:00';
     }
 
     private function normalizeLimit(int $limit): int

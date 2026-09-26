@@ -50,6 +50,16 @@ final class QueryEngineFilterTest extends TestCase
                         'service' => 'orders-service',
                         'route' => 'orders.show',
                     ],
+                    [
+                        'message' => 'unhandled payment failure',
+                        'file' => 'OrdersController.php',
+                        'line' => 42,
+                        'trace' => 'trace',
+                        'method' => 'POST',
+                        'unhandled' => true,
+                        'service' => 'orders-service',
+                        'route' => 'orders.show',
+                    ],
                 ],
                 'requests' => [
                     [
@@ -60,6 +70,11 @@ final class QueryEngineFilterTest extends TestCase
                     [
                         'url' => '/orders/2', 'method' => 'GET', 'status_code' => 200,
                         'duration_ms' => 90.0, 'memory_bytes' => 2048, 'ip' => '127.0.0.1',
+                        'service' => 'orders-service', 'route' => 'orders.show',
+                    ],
+                    [
+                        'url' => '/orders', 'method' => 'POST', 'status_code' => 500,
+                        'duration_ms' => 600.0, 'memory_bytes' => 2048, 'ip' => '127.0.0.1',
                         'service' => 'orders-service', 'route' => 'orders.show',
                     ],
                     [
@@ -101,10 +116,10 @@ final class QueryEngineFilterTest extends TestCase
             $queries = new QueryEngine($dbPath);
 
             $filteredStats = $queries->getSummaryStats('24h', 'orders-service', 'orders.show');
-            self::assertSame(1, $filteredStats['requests_total']);
-            self::assertSame(1, $filteredStats['exceptions_total']);
-            self::assertSame(2, $queries->getSummaryStats('all', 'orders-service', 'orders.show')['requests_total']);
-            self::assertSame(2, $queries->getSummaryStats('all', 'orders-service')['requests_total']);
+            self::assertSame(2, $filteredStats['requests_total']);
+            self::assertSame(2, $filteredStats['exceptions_total']);
+            self::assertSame(3, $queries->getSummaryStats('all', 'orders-service', 'orders.show')['requests_total']);
+            self::assertSame(3, $queries->getSummaryStats('all', 'orders-service')['requests_total']);
 
             self::assertSame(
                 'SELECT * FROM orders WHERE id = ?',
@@ -114,15 +129,35 @@ final class QueryEngineFilterTest extends TestCase
                 'http.outbound:payments.example.test',
                 $queries->getTopSpans(10, '24h', 'orders-service', 'orders.show')[0]['name']
             );
-            self::assertSame(1, count($queries->getLatestExceptions(10, '24h', 'orders-service', 'orders.show')));
-            self::assertSame(1, array_sum(array_column(
+            self::assertSame(2, count($queries->getLatestExceptions(10, '24h', 'orders-service', 'orders.show')));
+            self::assertSame(2, array_sum(array_column(
                 $queries->getRequestTimeline('24h', 'orders-service', 'orders.show'),
                 'requests'
             )));
-            self::assertSame(1, count($queries->getRecentRequests(100, '24h', 'orders-service', 'orders.show')));
+            self::assertSame(2, count($queries->getRecentRequests(100, '24h', 'orders-service', 'orders.show')));
             self::assertSame(1, count($queries->getOutboundRequests(100, '24h', 'orders-service', 'orders.show')));
             self::assertEquals(['catalog-service', 'orders-service'], $queries->getAvailableServices());
             self::assertContains('orders.show', $queries->getAvailableRoutes('orders-service'));
+
+            $from = gmdate('Y-m-d H:i:s', time() - 86400);
+            $to = gmdate('Y-m-d H:i:s', time() + 5);
+            $routeMetrics = $queries->getMetricsByRoute($from, $to, 'orders-service');
+            $metricsByMethod = array_column($routeMetrics, null, 'method');
+            self::assertSame(1, $metricsByMethod['GET']['total_requests']);
+            self::assertSame(1, $metricsByMethod['POST']['total_requests']);
+            self::assertEqualsWithDelta(100.0, $metricsByMethod['POST']['error_rate_percent'], 0.001);
+            self::assertSame(1, $metricsByMethod['POST']['unhandled_exceptions']);
+            self::assertSame(1, array_sum(array_column($metricsByMethod['POST']['timeline'], 'requests')));
+
+            $slowRequests = $queries->getSlowestRequestsByRoute(
+                $from,
+                $to,
+                'orders-service',
+                'orders.show',
+                'POST'
+            );
+            self::assertSame(500, $slowRequests[0]['status_code']);
+            self::assertSame(600.0, $slowRequests[0]['duration_ms']);
         } finally {
             unset($queries, $pdo, $storage);
             if (is_file($dbPath)) {

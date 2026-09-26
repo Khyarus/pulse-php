@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace PulsePHP\Dashboard;
 
 use Closure;
+use DateTimeImmutable;
+use DateTimeZone;
 use InvalidArgumentException;
 use PulsePHP\Storage\QueryEngine;
 use Throwable;
@@ -86,6 +88,41 @@ final class Dashboard
         $outboundRequests = $this->queries->getOutboundRequests(100, $period, $selectedService, $selectedRoute);
         $requests = $this->queries->getRecentRequests(100, $period, $selectedService, $selectedRoute);
         $exceptions = $this->queries->getLatestExceptions(100, $period, $selectedService, $selectedRoute);
+        [$from, $to] = $this->periodBounds($period);
+        $routeMetrics = $this->queries->getMetricsByRoute($from, $to, $selectedService);
+        if ($selectedRoute !== null) {
+            $routeMetrics = array_values(array_filter(
+                $routeMetrics,
+                static fn (array $metric): bool => $metric['route'] === $selectedRoute
+            ));
+        }
+
+        $routeCards = [];
+        $routeCharts = [];
+        foreach (array_slice($routeMetrics, 0, 12) as $metric) {
+            $health = $this->routeHealth($metric);
+            $metric['health'] = $health;
+            $metric['slow_requests'] = $this->queries->getSlowestRequestsByRoute(
+                $from,
+                $to,
+                $metric['service'],
+                $metric['route'],
+                $metric['method'],
+                5
+            );
+            $chartId = (string) count($routeCards);
+            $metric['chart_id'] = $chartId;
+            $routeCharts[$chartId] = [
+                'labels' => array_column($metric['timeline'], 'timestamp'),
+                'values' => array_column($metric['timeline'], 'avg_duration_ms'),
+                'color' => $health['color'],
+            ];
+            $routeCards[] = $metric;
+        }
+        $routeChartsJson = json_encode(
+            $routeCharts,
+            JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_THROW_ON_ERROR
+        );
 
         $chartData = [
             'requests' => [
@@ -156,6 +193,39 @@ final class Dashboard
     private function selectedOption(mixed $value, array $options): ?string
     {
         return is_string($value) && in_array($value, $options, true) ? $value : null;
+    }
+
+    /** @return array{string, string} */
+    private function periodBounds(string $period): array
+    {
+        $to = new DateTimeImmutable('now', new DateTimeZone('UTC'));
+        $modifier = match ($period) {
+            '15m' => '-15 minutes',
+            '24h' => '-24 hours',
+            '7d' => '-7 days',
+            default => '-1 hour',
+        };
+        $from = $to->modify($modifier);
+
+        return [$from->format('Y-m-d H:i:s'), $to->format('Y-m-d H:i:s')];
+    }
+
+    /** @param array{avg_duration_ms: float, error_rate_percent: float, unhandled_exceptions: int} $metric
+     *  @return array{key: string, label: string, color: string}
+     */
+    private function routeHealth(array $metric): array
+    {
+        if ($metric['unhandled_exceptions'] > 0
+            || $metric['avg_duration_ms'] > 1000
+            || $metric['error_rate_percent'] > 5) {
+            return ['key' => 'critical', 'label' => 'Critical', 'color' => '#f16d76'];
+        }
+
+        if ($metric['avg_duration_ms'] >= 300 || $metric['error_rate_percent'] >= 1) {
+            return ['key' => 'warning', 'label' => 'Warning', 'color' => '#e7b957'];
+        }
+
+        return ['key' => 'healthy', 'label' => 'Healthy', 'color' => '#42c98a'];
     }
 
     private function getDenialStatus(): ?int

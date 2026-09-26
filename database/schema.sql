@@ -24,6 +24,8 @@ CREATE TABLE IF NOT EXISTS pulse_exceptions (
     file TEXT NOT NULL,
     line INTEGER NOT NULL,
     trace TEXT NOT NULL,
+    method TEXT NOT NULL DEFAULT '',
+    unhandled INTEGER NOT NULL DEFAULT 0,
     service TEXT NOT NULL DEFAULT 'default',
     route TEXT NOT NULL DEFAULT '/',
     created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP

@@ -103,14 +103,27 @@ Opcionalmente, configure Basic Auth e uma lista de IPs permitidos no `.env`:
 PULSE_DASHBOARD_USER=pulse-admin
 PULSE_DASHBOARD_PASSWORD=use-um-segredo-forte
 PULSE_DASHBOARD_IPS=127.0.0.1,::1
-PULSE_SERVICE_NAME=orders-api
+PULSE_SERVICE_NAME=api-pagamentos
 ```
 
 Quando configuradas, as credenciais e a whitelist são verificadas além do Gate. O arquivo publicado também permite ajustar `enabled`, rota, middleware e coletores.
 
 As chamadas feitas por `Illuminate\Support\Facades\Http` são registradas pelos eventos do cliente HTTP do Laravel. Cada chamada aparece como span `http.outbound:{host}` e também na tabela de chamadas outbound, com método, status e duração. Por segurança, credenciais e query string são removidas da URL persistida. Ative ou desative essa captura em `collect_outbound_requests`.
 
-O Dashboard filtra por período (15 minutos, 1 hora, 24 horas ou 7 dias), serviço e rota. Cada widget alterna entre gráfico e tabela; tabelas permitem ordenação e paginação. Visibilidade, ordem, recolhimento e visualização são salvos no `localStorage` do navegador.
+Não é necessário adicionar `pulse_start()` ao redor de cada chamada:
+
+```php
+use Illuminate\Support\Facades\Http;
+
+$response = Http::withToken(config('services.stripe.secret'))
+    ->get('https://api.stripe.com/v1/balance');
+```
+
+O middleware registra automaticamente o método, status, duração e destino sanitizado. A captura cobre o cliente `Http` do Laravel; chamadas Guzzle diretas não passam por esse interceptor.
+
+O Dashboard filtra por período (15 minutos, 1 hora, 24 horas ou 7 dias), serviço e rota, e inclui cartões individuais por rota/método com total de requests, duração média, taxa de erro e sparkline. A saúde é verde quando a média fica abaixo de 300 ms e a taxa de erro abaixo de 1%; amarela com média de 300 a 1000 ms ou erros de 1% a 5%; e vermelha acima de 1000 ms, acima de 5% de erros ou com exceção não tratada recente. Os cards mostram as cinco requests mais lentas ao expandir. Cada widget alterna entre gráfico e tabela; tabelas permitem ordenação e paginação. Visibilidade, ordem, recolhimento e visualização são salvos no `localStorage` do navegador.
+
+Para consumir a agregação por rota no próprio PHP, use `QueryEngine::getMetricsByRoute($from, $to, $service)`. O intervalo aceita datas válidas e o serviço é opcional; cada item inclui método, contagens, duração média, taxa de erro, exceções não tratadas e série temporal.
 
 ## Testes
 

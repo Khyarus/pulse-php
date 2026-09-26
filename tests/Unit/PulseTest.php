@@ -60,11 +60,11 @@ final class PulseTest extends TestCase
     public function test_it_attaches_service_and_route_context_to_telemetry(): void
     {
         $pulse = Pulse::init(':memory:', false, 'billing-service');
-        $pulse->setContext('billing-service', 'orders.create');
+        $pulse->setContext('billing-service', 'orders.create', 'POST');
         $pulse->recordMetric('orders.created', 1.0);
         $pulse->recordQuery('SELECT 1', 0.5);
         $pulse->recordRequest('/orders', 'POST', 201, 2.0, 128);
-        $pulse->recordException(new RuntimeException('sample failure'));
+        $pulse->recordException(new RuntimeException('sample failure'), true);
         $pulse->startTimer('order.persist');
         $pulse->endTimer('order.persist');
         $pulse->recordOutboundRequest('https://user:secret@example.test/pay?token=hidden', 'post', 201, 9.0);
@@ -85,6 +85,10 @@ final class PulseTest extends TestCase
             self::assertSame('billing-service', $record['service'], $table);
             self::assertSame('orders.create', $record['route'], $table);
         }
+
+        $exception = $pdo->query('SELECT method, unhandled FROM pulse_exceptions')->fetch(PDO::FETCH_ASSOC);
+        self::assertSame('POST', $exception['method']);
+        self::assertSame(1, (int) $exception['unhandled']);
 
         $outbound = $pdo->query('SELECT method, status_code, url FROM pulse_outbound_requests')
             ->fetch(PDO::FETCH_ASSOC);

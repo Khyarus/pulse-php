@@ -32,6 +32,7 @@ final class Pulse
     private ?RequestCollector $requestCollector;
     private string $service = 'default';
     private string $route = '/';
+    private string $method = '';
 
     private function __construct(
         private StorageInterface $storage,
@@ -39,7 +40,11 @@ final class Pulse
         string $serviceName
     )
     {
-        $this->setContext($serviceName, $this->routeFromRequest());
+        $this->setContext(
+            $serviceName,
+            $this->routeFromRequest(),
+            (string) ($_SERVER['REQUEST_METHOD'] ?? '')
+        );
 
         if ($registerStandaloneCollectors) {
             (new ExceptionCollector($this))->register();
@@ -71,11 +76,14 @@ final class Pulse
         return self::$instance;
     }
 
-    public function setContext(string $service, ?string $route = null): void
+    public function setContext(string $service, ?string $route = null, ?string $method = null): void
     {
         $this->service = trim($service) !== '' ? trim($service) : 'default';
         if ($route !== null) {
             $this->route = trim($route) !== '' ? trim($route) : '/';
+        }
+        if ($method !== null) {
+            $this->method = strtoupper(trim($method));
         }
     }
 
@@ -132,13 +140,15 @@ final class Pulse
         ];
     }
 
-    public function recordException(Throwable $exception): void
+    public function recordException(Throwable $exception, bool $unhandled = false): void
     {
         $this->buffer['exceptions'][] = [
             'message' => $exception->getMessage(),
             'file' => $exception->getFile(),
             'line' => $exception->getLine(),
             'trace' => $exception->getTraceAsString(),
+            'method' => $this->method,
+            'unhandled' => $unhandled,
             'service' => $this->service,
             'route' => $this->route,
         ];

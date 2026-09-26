@@ -29,7 +29,11 @@ final class PulseMiddleware
             ? $matchedRoute->uri()
             : null;
         $routeContext = $routeName ?: $routeUri ?: '/' . ltrim($request->path(), '/');
-        $pulse->setContext((string) config('pulse.service_name', 'default'), $routeContext);
+        $pulse->setContext(
+            (string) config('pulse.service_name', 'default'),
+            $routeContext,
+            $request->method()
+        );
 
         if (!$collectRequests && !$collectExceptions) {
             return $next($request);
@@ -42,7 +46,7 @@ final class PulseMiddleware
             $response = $next($request);
         } catch (Throwable $exception) {
             if ($collectExceptions) {
-                $pulse->recordException($exception);
+                $pulse->recordException($exception, true);
             }
             if ($collectRequests) {
                 $this->recordRequest($pulse, $request, 500, $startedAt, $memoryAtStart);

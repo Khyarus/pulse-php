@@ -101,8 +101,8 @@ final class SQLiteStorage implements StorageInterface
     private function writeExceptions(array $exceptions): void
     {
         $statement = $this->pdo->prepare(
-            'INSERT INTO pulse_exceptions (message, file, line, trace, service, route) '
-            . 'VALUES (:message, :file, :line, :trace, :service, :route)'
+            'INSERT INTO pulse_exceptions (message, file, line, trace, method, unhandled, service, route) '
+            . 'VALUES (:message, :file, :line, :trace, :method, :unhandled, :service, :route)'
         );
 
         foreach ($exceptions as $exception) {
@@ -111,6 +111,8 @@ final class SQLiteStorage implements StorageInterface
                 ':file' => $exception['file'],
                 ':line' => $exception['line'],
                 ':trace' => $exception['trace'],
+                ':method' => $exception['method'] ?? '',
+                ':unhandled' => (int) ($exception['unhandled'] ?? false),
                 ':service' => $exception['service'] ?? 'default',
                 ':route' => $exception['route'] ?? '/',
             ]);
@@ -220,6 +222,19 @@ final class SQLiteStorage implements StorageInterface
                     $this->pdo->exec(
                         sprintf('ALTER TABLE %s ADD COLUMN %s %s', $table, $column, $definition)
                     );
+                }
+            }
+
+            if ($table === 'pulse_exceptions') {
+                foreach ([
+                    'method' => "TEXT NOT NULL DEFAULT ''",
+                    'unhandled' => 'INTEGER NOT NULL DEFAULT 0',
+                ] as $column => $definition) {
+                    if (!in_array($column, $columns, true)) {
+                        $this->pdo->exec(
+                            sprintf('ALTER TABLE %s ADD COLUMN %s %s', $table, $column, $definition)
+                        );
+                    }
                 }
             }
         }

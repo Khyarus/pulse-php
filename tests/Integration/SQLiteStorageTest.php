@@ -98,6 +98,16 @@ final class SQLiteStorageTest extends TestCase
                 "INSERT INTO pulse_requests (url, method, status_code, duration_ms, memory_bytes, ip) "
                 . "VALUES ('/legacy', 'GET', 200, 1.5, 128, '127.0.0.1')"
             );
+            $legacyPdo->exec(
+                'CREATE TABLE pulse_exceptions ('
+                . 'id INTEGER PRIMARY KEY AUTOINCREMENT, message TEXT NOT NULL, file TEXT NOT NULL, '
+                . 'line INTEGER NOT NULL, trace TEXT NOT NULL, '
+                . 'created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP)'
+            );
+            $legacyPdo->exec(
+                "INSERT INTO pulse_exceptions (message, file, line, trace) "
+                . "VALUES ('legacy exception', 'legacy.php', 5, 'trace')"
+            );
             unset($legacyPdo);
 
             new SQLiteStorage($dbPath);
@@ -109,6 +119,11 @@ final class SQLiteStorageTest extends TestCase
             self::assertSame('/legacy', $request['url']);
             self::assertSame('default', $request['service']);
             self::assertSame('/', $request['route']);
+            $exception = $migratedPdo->query(
+                'SELECT method, unhandled FROM pulse_exceptions WHERE id = 1'
+            )->fetch(PDO::FETCH_ASSOC);
+            self::assertSame('', $exception['method']);
+            self::assertSame(0, (int) $exception['unhandled']);
             unset($migratedPdo);
         } finally {
             if (is_file($dbPath)) {

@@ -89,11 +89,26 @@ final class DashboardAuthTest extends TestCase
                     'service' => 'orders-api', 'route' => 'orders.show',
                 ],
                 [
+                    'url' => '/orders', 'method' => 'POST', 'status_code' => 500,
+                    'duration_ms' => 650.0, 'memory_bytes' => 2048, 'ip' => '127.0.0.1',
+                    'service' => 'orders-api', 'route' => 'orders.show',
+                ],
+                [
                     'url' => '/catalog/search', 'method' => 'GET', 'status_code' => 200,
                     'duration_ms' => 25.0, 'memory_bytes' => 1024, 'ip' => '127.0.0.1',
                     'service' => 'catalog-api', 'route' => 'catalog.search',
                 ],
             ],
+            'exceptions' => [[
+                'message' => 'unhandled order failure',
+                'file' => 'OrdersController.php',
+                'line' => 42,
+                'trace' => 'trace',
+                'method' => 'POST',
+                'unhandled' => true,
+                'service' => 'orders-api',
+                'route' => 'orders.show',
+            ]],
         ]);
         unset($storage);
         $_GET = [
@@ -110,10 +125,41 @@ final class DashboardAuthTest extends TestCase
         self::assertStringContainsString('value="24h" selected', $html);
         self::assertStringContainsString('value="orders-api" selected', $html);
         self::assertStringContainsString('value="orders.show" selected', $html);
+        self::assertStringContainsString('Rotas &amp; APIs Monitoradas', $html);
+        self::assertStringContainsString('data-severity="healthy"', $html);
+        self::assertStringContainsString('data-severity="critical"', $html);
+        self::assertStringContainsString('data-method="GET"', $html);
+        self::assertStringContainsString('Unhandled exceptions: 1', $html);
         self::assertStringContainsString('/orders/42', $html);
         self::assertStringNotContainsString('/catalog/search', $html);
         self::assertStringContainsString('pulse-dashboard-v2', $html);
         self::assertStringContainsString('data-sortable', $html);
+    }
+
+    public function test_it_marks_a_route_warning_at_the_latency_threshold(): void
+    {
+        $storage = new SQLiteStorage($this->dbPath);
+        $storage->writeBatch([
+            'requests' => [[
+                'url' => '/reports',
+                'method' => 'PUT',
+                'status_code' => 200,
+                'duration_ms' => 300.0,
+                'memory_bytes' => 1024,
+                'ip' => '127.0.0.1',
+                'service' => 'reports-api',
+                'route' => 'reports.update',
+            ]],
+        ]);
+        unset($storage);
+        $_GET = ['service' => 'reports-api'];
+
+        [, $html] = $this->render(
+            (new Dashboard($this->dbPath))->authorize(static fn (): bool => true)
+        );
+
+        self::assertStringContainsString('data-severity="warning"', $html);
+        self::assertStringContainsString('data-method="PUT"', $html);
     }
 
     /** @return array{int, string} */
