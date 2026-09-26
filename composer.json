@@ -7,6 +7,9 @@
     "ext-pdo": "*",
     "ext-pdo_sqlite": "*"
   },
+  "suggest": {
+    "illuminate/support": "Required only for the optional Laravel 9+ integration."
+  },
   "autoload": {
     "psr-4": {
       "PulsePHP\\": "src/"
@@ -14,5 +17,12 @@
     "files": [
       "src/Support/helpers.php"
     ]
+  },
+  "extra": {
+    "laravel": {
+      "providers": [
+        "PulsePHP\\Laravel\\PulseServiceProvider"
+      ]
+    }
   }
 }

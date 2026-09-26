@@ -4,20 +4,67 @@ declare(strict_types=1);
 
 namespace PulsePHP\Dashboard;
 
+use Closure;
+use InvalidArgumentException;
 use PulsePHP\Storage\QueryEngine;
-use Throwable;
 
 final class Dashboard
 {
     private QueryEngine $queries;
+    private ?array $basicAuth = null;
+    private ?array $allowedIps = null;
+    private ?Closure $authorizationCallback = null;
+    private bool $authorizationConfigured = false;
 
     public function __construct(string $dbPath)
     {
         $this->queries = new QueryEngine($dbPath);
     }
 
+    public function authWithBasic(string $username, string $password): self
+    {
+        if ($username === '' || $password === '') {
+            throw new InvalidArgumentException('Dashboard Basic Auth requires a username and password.');
+        }
+
+        $this->basicAuth = [
+            'username' => hash('sha256', $username),
+            'password' => hash('sha256', $password),
+        ];
+        $this->authorizationConfigured = true;
+
+        return $this;
+    }
+
+    /** @param list<string> $ips */
+    public function authWithIp(array $ips): self
+    {
+        $this->allowedIps = array_values(array_unique(array_filter(
+            $ips,
+            static fn (mixed $ip): bool => is_string($ip) && $ip !== ''
+        )));
+        $this->authorizationConfigured = true;
+
+        return $this;
+    }
+
+    public function authorize(Closure $callback): self
+    {
+        $this->authorizationCallback = $callback;
+        $this->authorizationConfigured = true;
+
+        return $this;
+    }
+
     public function render(): void
     {
+        $denialStatus = $this->getDenialStatus();
+        if ($denialStatus !== null) {
+            $this->renderAccessDenied($denialStatus);
+
+            return;
+        }
+
         $stats = $this->queries->getSummaryStats();
         $timeline = $this->queries->getRequestTimeline();
         $slowQueries = $this->queries->getSlowestQueries();
@@ -316,5 +363,80 @@ HTML;
     private function escape(string $value): string
     {
         return htmlspecialchars($value, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
+    }
+
+    private function getDenialStatus(): ?int
+    {
+        if (!$this->authorizationConfigured) {
+            return 403;
+        }
+
+        if ($this->basicAuth !== null) {
+            $credentials = $this->readBasicCredentials();
+            if ($credentials === null) {
+                return 401;
+            }
+
+            $usernameMatches = hash_equals($this->basicAuth['username'], hash('sha256', $credentials[0]));
+            $passwordMatches = hash_equals($this->basicAuth['password'], hash('sha256', $credentials[1]));
+            if (!$usernameMatches || !$passwordMatches) {
+                return 401;
+            }
+        }
+
+        if ($this->allowedIps !== null
+            && !in_array((string) ($_SERVER['REMOTE_ADDR'] ?? ''), $this->allowedIps, true)) {
+            return 403;
+        }
+
+        if ($this->authorizationCallback !== null) {
+            try {
+                if (!(($this->authorizationCallback)())) {
+                    return 403;
+                }
+            } catch (\Throwable) {
+                return 403;
+            }
+        }
+
+        return null;
+    }
+
+    /** @return array{string, string}|null */
+    private function readBasicCredentials(): ?array
+    {
+        if (isset($_SERVER['PHP_AUTH_USER'], $_SERVER['PHP_AUTH_PW'])) {
+            return [(string) $_SERVER['PHP_AUTH_USER'], (string) $_SERVER['PHP_AUTH_PW']];
+        }
+
+        $authorization = (string) ($_SERVER['HTTP_AUTHORIZATION']
+            ?? $_SERVER['REDIRECT_HTTP_AUTHORIZATION']
+            ?? '');
+        if (!preg_match('/^Basic\s+(.+)$/i', $authorization, $matches)) {
+            return null;
+        }
+
+        $decoded = base64_decode($matches[1], true);
+        if ($decoded === false || !str_contains($decoded, ':')) {
+            return null;
+        }
+
+        return explode(':', $decoded, 2);
+    }
+
+    private function renderAccessDenied(int $status): void
+    {
+        http_response_code($status);
+
+        if (!headers_sent()) {
+            header('Content-Type: text/html; charset=UTF-8');
+            header('Cache-Control: no-store, private');
+            if ($status === 401) {
+                header('WWW-Authenticate: Basic realm="PulsePHP Dashboard", charset="UTF-8"');
+            }
+        }
+
+        echo '<!doctype html><html lang="en"><meta charset="utf-8">'
+            . '<title>Access denied</title><body><h1>Access denied</h1></body></html>';
     }
 }

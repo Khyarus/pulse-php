@@ -28,22 +28,30 @@ final class Pulse
     /** @var array<string, array{started_at: int, memory: int}> */
     private array $timers = [];
 
-    private RequestCollector $requestCollector;
+    private ?RequestCollector $requestCollector;
 
-    private function __construct(private StorageInterface $storage)
+    private function __construct(
+        private StorageInterface $storage,
+        bool $registerStandaloneCollectors
+    )
     {
-        (new ExceptionCollector($this))->register();
-        $this->requestCollector = new RequestCollector($this);
+        if ($registerStandaloneCollectors) {
+            (new ExceptionCollector($this))->register();
+            $this->requestCollector = new RequestCollector($this);
+        } else {
+            $this->requestCollector = null;
+        }
+
         register_shutdown_function([$this, 'flush']);
     }
 
-    public static function init(string $dbPath): self
+    public static function init(string $dbPath, bool $registerStandaloneCollectors = true): self
     {
         if (self::$instance !== null) {
             return self::$instance;
         }
 
-        self::$instance = new self(new SQLiteStorage($dbPath));
+        self::$instance = new self(new SQLiteStorage($dbPath), $registerStandaloneCollectors);
 
         return self::$instance;
     }
@@ -135,7 +143,7 @@ final class Pulse
 
     public function flush(): void
     {
-        $this->requestCollector->collect();
+        $this->requestCollector?->collect();
 
         if ($this->buffer === [
             'metrics' => [],

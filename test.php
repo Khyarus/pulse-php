@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use PulsePHP\Pulse;
+use PulsePHP\Dashboard\Dashboard;
 use PulsePHP\Storage\CatalogEngine;
 
 require_once __DIR__ . '/src/Support/helpers.php';
@@ -128,6 +129,66 @@ try {
         || (int) $request['status_code'] !== 200
         || $request['ip'] !== '127.0.0.1') {
         throw new RuntimeException('The simulated HTTP request was not recorded correctly.');
+    }
+
+    $assertDashboardStatus = static function (Dashboard $dashboard, int $expectedStatus): string {
+        http_response_code(200);
+        ob_start();
+        $dashboard->render();
+        $html = (string) ob_get_clean();
+
+        if (http_response_code() !== $expectedStatus) {
+            throw new RuntimeException(
+                sprintf('Dashboard expected HTTP %d, got %d.', $expectedStatus, http_response_code())
+            );
+        }
+
+        return $html;
+    };
+
+    unset($_SERVER['PHP_AUTH_USER'], $_SERVER['PHP_AUTH_PW'], $_SERVER['HTTP_AUTHORIZATION']);
+    $deniedHtml = $assertDashboardStatus(new Dashboard($dbPath), 403);
+    if (!str_contains($deniedHtml, 'Access denied') || str_contains($deniedHtml, 'Application pulse')) {
+        throw new RuntimeException('Dashboard should deny access when no policy is configured.');
+    }
+
+    $_SERVER['REMOTE_ADDR'] = '10.0.0.5';
+    $ipDeniedHtml = $assertDashboardStatus(
+        (new Dashboard($dbPath))->authWithIp(['127.0.0.1', '::1']),
+        403
+    );
+    if (!str_contains($ipDeniedHtml, 'Access denied')) {
+        throw new RuntimeException('Dashboard should reject addresses outside its IP whitelist.');
+    }
+
+    $callbackDeniedHtml = $assertDashboardStatus(
+        (new Dashboard($dbPath))->authorize(static fn (): bool => false),
+        403
+    );
+    if (!str_contains($callbackDeniedHtml, 'Access denied')) {
+        throw new RuntimeException('Dashboard should reject a callback that denies access.');
+    }
+
+    $_SERVER['PHP_AUTH_USER'] = 'pulse-admin';
+    $_SERVER['PHP_AUTH_PW'] = 'wrong-password';
+    $basicDeniedHtml = $assertDashboardStatus(
+        (new Dashboard($dbPath))->authWithBasic('pulse-admin', 'correct-password'),
+        401
+    );
+    if (!str_contains($basicDeniedHtml, 'Access denied')) {
+        throw new RuntimeException('Dashboard should reject invalid Basic Auth credentials.');
+    }
+
+    unset($_SERVER['PHP_AUTH_USER'], $_SERVER['PHP_AUTH_PW']);
+    $_SERVER['HTTP_AUTHORIZATION'] = 'Basic ' . base64_encode('pulse-admin:correct-password');
+    $_SERVER['REMOTE_ADDR'] = '127.0.0.1';
+    $authorizedDashboard = (new Dashboard($dbPath))
+        ->authWithBasic('pulse-admin', 'correct-password')
+        ->authWithIp(['127.0.0.1', '::1'])
+        ->authorize(static fn (): bool => true);
+    $authorizedHtml = $assertDashboardStatus($authorizedDashboard, 200);
+    if (!str_contains($authorizedHtml, 'Application pulse')) {
+        throw new RuntimeException('Dashboard should render when every authorization policy passes.');
     }
 
     echo "PulsePHP smoke test passed.\n";
