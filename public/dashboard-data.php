@@ -3,4 +3,4 @@
 declare(strict_types=1);
 
 $dashboard = require __DIR__ . '/_dashboard_bootstrap.php';
-$dashboard->render();
+$dashboard->renderJson();

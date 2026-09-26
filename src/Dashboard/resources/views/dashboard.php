@@ -77,17 +77,33 @@ $escape = static fn (mixed $value): string => htmlspecialchars(
                     <p class="eyebrow mt-1 text-[10px] font-semibold uppercase text-[#718078]">Local observability</p>
                 </div>
             </div>
-            <details class="relative text-xs">
-                <summary class="cursor-pointer rounded-md border border-[#2a3631] bg-[#121916] px-3 py-2 font-medium text-[#b1c0b7]">Widgets</summary>
-                <div class="absolute right-0 z-20 mt-2 w-56 border border-[#2a3631] bg-[#121916] p-3 shadow-lg">
-                    <template x-for="widget in order" :key="widget">
-                        <label class="flex cursor-pointer items-center gap-2 py-2 text-[#b1c0b7]">
-                            <input type="checkbox" :checked="settings[widget].visible" @change="setVisible(widget, $event.target.checked)">
-                            <span x-text="labels[widget]"></span>
-                        </label>
-                    </template>
-                </div>
-            </details>
+            <div class="flex flex-wrap items-center gap-3">
+                <label class="flex items-center gap-2 text-xs text-[#b1c0b7]">
+                    Auto-Refresh (Ao vivo)
+                    <select aria-label="Auto-Refresh interval" x-model.number="refreshSeconds" @change="setRefreshInterval($event.target.value)" class="h-9 border border-[#2a3631] bg-[#121916] px-2 text-xs text-[#e8f0eb]">
+                        <option value="0">Desativado</option>
+                        <option value="1">1s</option>
+                        <option value="2">2s</option>
+                        <option value="5">5s</option>
+                    </select>
+                </label>
+                <span x-show="refreshSeconds > 0" class="inline-flex items-center gap-2 text-[10px] font-semibold tracking-wider text-[#42c98a]" aria-live="polite">
+                    <span class="relative flex h-2 w-2"><span class="absolute inline-flex h-full w-full animate-ping rounded-full bg-[#42c98a] opacity-70"></span><span class="relative inline-flex h-2 w-2 rounded-full bg-[#42c98a]"></span></span>
+                    LIVE
+                </span>
+                <span x-show="refreshError" class="text-[10px] text-[#f16d76]" role="status">Refresh failed</span>
+                <details class="relative text-xs">
+                    <summary class="cursor-pointer rounded-md border border-[#2a3631] bg-[#121916] px-3 py-2 font-medium text-[#b1c0b7]">Widgets</summary>
+                    <div class="absolute right-0 z-20 mt-2 w-56 border border-[#2a3631] bg-[#121916] p-3 shadow-lg">
+                        <template x-for="widget in order" :key="widget">
+                            <label class="flex cursor-pointer items-center gap-2 py-2 text-[#b1c0b7]">
+                                <input type="checkbox" :checked="settings[widget].visible" @change="setVisible(widget, $event.target.checked)">
+                                <span x-text="labels[widget]"></span>
+                            </label>
+                        </template>
+                    </div>
+                </details>
+            </div>
         </div>
     </header>
 
@@ -132,19 +148,19 @@ $escape = static fn (mixed $value): string => htmlspecialchars(
         <section aria-label="Summary statistics" class="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
             <article class="panel p-4 sm:p-5">
                 <p class="text-xs font-medium text-[#68776f]">Requests <span class="ml-1 text-[10px] uppercase text-[#9aa69f]"><?= $escape($periodLabel) ?></span></p>
-                <p class="mono mt-3 text-[27px] font-medium leading-none"><?= $escape($requestCount) ?></p>
+                <p class="mono mt-3 text-[27px] font-medium leading-none"><span x-text="formatNumber(liveStats.requests_total)"><?= $escape($requestCount) ?></span></p>
             </article>
             <article class="panel p-4 sm:p-5">
                 <p class="text-xs font-medium text-[#68776f]">Average response</p>
-                <p class="mono mt-3 text-[27px] font-medium leading-none"><?= $escape($averageDuration) ?><span class="ml-1 text-sm text-[#718078]">ms</span></p>
+                <p class="mono mt-3 text-[27px] font-medium leading-none"><span x-text="formatFixed(liveStats.avg_response_ms, 2)"><?= $escape($averageDuration) ?></span><span class="ml-1 text-sm text-[#718078]">ms</span></p>
             </article>
             <article class="panel p-4 sm:p-5">
                 <p class="text-xs font-medium text-[#68776f]">Peak request memory</p>
-                <p class="mono mt-3 text-[27px] font-medium leading-none"><?= $escape($peakMemory) ?><span class="ml-1 text-sm text-[#718078]">MB</span></p>
+                <p class="mono mt-3 text-[27px] font-medium leading-none"><span x-text="formatFixed(liveStats.peak_memory_bytes / 1048576, 1)"><?= $escape($peakMemory) ?></span><span class="ml-1 text-sm text-[#718078]">MB</span></p>
             </article>
             <article class="panel p-4 sm:p-5">
                 <p class="text-xs font-medium text-[#68776f]">Exceptions <span class="ml-1 text-[10px] uppercase text-[#9aa69f]"><?= $escape($periodLabel) ?></span></p>
-                <p class="mono mt-3 text-[27px] font-medium leading-none"><?= $escape($exceptionCount) ?></p>
+                <p class="mono mt-3 text-[27px] font-medium leading-none"><span x-text="formatNumber(liveStats.exceptions_total)"><?= $escape($exceptionCount) ?></span></p>
             </article>
         </section>
 
@@ -154,54 +170,46 @@ $escape = static fn (mixed $value): string => htmlspecialchars(
                     <p class="eyebrow text-[10px] font-semibold uppercase text-[#42c98a]">Route health</p>
                     <h2 id="routes-title" class="mt-1 text-lg font-semibold">Rotas &amp; APIs Monitoradas</h2>
                 </div>
-                <p class="text-xs text-[#9aa9a1]">Top <?= count($routeCards) ?> routes in <?= $escape($periodLabel) ?></p>
+                <p class="text-xs text-[#9aa9a1]">Top <span x-text="routeCards.length"><?= count($routeCards) ?></span> routes in <?= $escape($periodLabel) ?></p>
             </div>
-            <?php if ($routeCards === []): ?>
-                <div class="panel px-4 py-8 text-center text-sm text-[#9aa9a1]">Nenhuma rota foi registrada neste período/filtro.</div>
-            <?php else: ?>
-                <div class="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
-                    <?php foreach ($routeCards as $card): ?>
-                        <article class="route-card panel p-4" data-severity="<?= $escape($card['health']['key']) ?>" style="--route-health: <?= $escape($card['health']['color']) ?>">
-                            <div class="flex items-start justify-between gap-3">
-                                <div class="min-w-0">
-                                    <p class="break-all text-sm font-semibold"><?= $escape($card['route']) ?></p>
-                                    <p class="mt-1 truncate text-xs text-[#9aa9a1]"><?= $escape($card['service']) ?></p>
-                                </div>
-                                <div class="flex shrink-0 items-center gap-2">
-                                    <span class="method-badge" data-method="<?= $escape($card['method']) ?>"><?= $escape($card['method']) ?></span>
-                                    <span class="health-badge rounded px-2 py-1 text-[10px] font-semibold uppercase"><?= $escape($card['health']['label']) ?></span>
-                                </div>
+            <div x-show="routeCards.length === 0" x-cloak class="panel px-4 py-8 text-center text-sm text-[#9aa9a1]">Nenhuma rota foi registrada neste período/filtro.</div>
+            <div x-show="routeCards.length > 0" x-cloak class="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
+                <template x-for="card in routeCards" :key="card.chart_id">
+                    <article class="route-card panel p-4" :data-severity="card.health.key" :style="{ '--route-health': card.health.color }">
+                        <div class="flex items-start justify-between gap-3">
+                            <div class="min-w-0">
+                                <p class="break-all text-sm font-semibold" x-text="card.route"></p>
+                                <p class="mt-1 truncate text-xs text-[#9aa9a1]" x-text="card.service"></p>
                             </div>
-                            <div class="mt-4 grid grid-cols-3 gap-2">
-                                <div><p class="text-[10px] uppercase text-[#89968f]">Requests</p><p class="mono mt-1 text-sm"><?= $escape(number_format($card['total_requests'])) ?></p></div>
-                                <div><p class="text-[10px] uppercase text-[#89968f]">Avg</p><p class="mono mt-1 text-sm"><?= $escape(number_format($card['avg_duration_ms'], 1)) ?> ms</p></div>
-                                <div><p class="text-[10px] uppercase text-[#89968f]">Errors</p><p class="mono mt-1 text-sm"><?= $escape(number_format($card['error_rate_percent'], 2)) ?>%</p></div>
+                            <div class="flex shrink-0 items-center gap-2">
+                                <span class="method-badge" :data-method="card.method" x-text="card.method"></span>
+                                <span class="health-badge rounded px-2 py-1 text-[10px] font-semibold uppercase" x-text="card.health.label"></span>
                             </div>
-                            <div class="route-sparkline mt-3"><canvas id="route-chart-<?= $escape($card['chart_id']) ?>" aria-label="Response time trend for <?= $escape($card['route']) ?>" role="img"></canvas></div>
-                            <?php if ($card['unhandled_exceptions'] > 0): ?>
-                                <p class="mt-2 text-xs text-[#f16d76]">Unhandled exceptions: <?= $escape($card['unhandled_exceptions']) ?></p>
-                            <?php endif; ?>
-                            <button type="button" class="mt-3 border border-[#2a3631] px-2 py-1.5 text-xs text-[#b1c0b7]" @click="toggleRouteDetails('<?= $escape($card['chart_id']) ?>')" :aria-expanded="routeExpanded('<?= $escape($card['chart_id']) ?>')">
-                                <span x-text="routeExpanded('<?= $escape($card['chart_id']) ?>') ? 'Hide slow requests' : 'Show 5 slowest requests'"></span>
-                            </button>
-                            <div class="mt-3 border-t border-[#2a3631] pt-2" x-show="routeExpanded('<?= $escape($card['chart_id']) ?>')" x-cloak>
-                                <?php if ($card['slow_requests'] === []): ?>
-                                    <p class="py-2 text-xs text-[#9aa9a1]">No requests in this route.</p>
-                                <?php else: ?>
-                                    <ul class="space-y-2">
-                                        <?php foreach ($card['slow_requests'] as $slowRequest): ?>
-                                            <li class="flex items-start justify-between gap-3 text-xs">
-                                                <span class="min-w-0 break-all text-[#b1c0b7]"><?= $escape($slowRequest['url']) ?><span class="ml-2 text-[#89968f]"><?= $escape($slowRequest['status_code']) ?></span></span>
-                                                <span class="mono shrink-0" style="color: var(--route-health)"><?= $escape(number_format($slowRequest['duration_ms'], 1)) ?> ms</span>
-                                            </li>
-                                        <?php endforeach; ?>
-                                    </ul>
-                                <?php endif; ?>
-                            </div>
-                        </article>
-                    <?php endforeach; ?>
-                </div>
-            <?php endif; ?>
+                        </div>
+                        <div class="mt-4 grid grid-cols-3 gap-2">
+                            <div><p class="text-[10px] uppercase text-[#89968f]">Requests</p><p class="mono mt-1 text-sm" x-text="formatNumber(card.total_requests)"></p></div>
+                            <div><p class="text-[10px] uppercase text-[#89968f]">Avg</p><p class="mono mt-1 text-sm"><span x-text="formatFixed(card.avg_duration_ms, 1)"></span> ms</p></div>
+                            <div><p class="text-[10px] uppercase text-[#89968f]">Errors</p><p class="mono mt-1 text-sm"><span x-text="formatFixed(card.error_rate_percent, 2)"></span>%</p></div>
+                        </div>
+                        <div class="route-sparkline mt-3"><canvas :id="'route-chart-' + card.chart_id" :aria-label="'Response time trend for ' + card.route" role="img"></canvas></div>
+                        <p x-show="card.unhandled_exceptions > 0" x-cloak class="mt-2 text-xs text-[#f16d76]">Unhandled exceptions: <span x-text="card.unhandled_exceptions"></span></p>
+                        <button type="button" class="mt-3 border border-[#2a3631] px-2 py-1.5 text-xs text-[#b1c0b7]" @click="toggleRouteDetails(card.chart_id)" :aria-expanded="routeExpanded(card.chart_id)">
+                            <span x-text="routeExpanded(card.chart_id) ? 'Hide slow requests' : 'Show 5 slowest requests'"></span>
+                        </button>
+                        <div class="mt-3 border-t border-[#2a3631] pt-2" x-show="routeExpanded(card.chart_id)" x-cloak>
+                            <template x-if="card.slow_requests.length === 0"><p class="py-2 text-xs text-[#9aa9a1]">No requests in this route.</p></template>
+                            <ul class="space-y-2">
+                                <template x-for="request in card.slow_requests" :key="request.created_at + request.url">
+                                    <li class="flex items-start justify-between gap-3 text-xs">
+                                        <span class="min-w-0 break-all text-[#b1c0b7]"><span x-text="request.url"></span><span class="ml-2 text-[#89968f]" x-text="request.status_code"></span></span>
+                                        <span class="mono shrink-0" style="color: var(--route-health)"><span x-text="formatFixed(request.duration_ms, 1)"></span> ms</span>
+                                    </li>
+                                </template>
+                            </ul>
+                        </div>
+                    </article>
+                </template>
+            </div>
         </section>
 
         <div class="mt-4 grid grid-cols-1 gap-4 xl:grid-cols-2">
@@ -216,8 +224,9 @@ $escape = static fn (mixed $value): string => htmlspecialchars(
     </main>
 
     <script>
+        const pulseInitialLiveData = <?= $liveDataJson ?>;
         const pulseChartData = <?= $chartsJson ?>;
-        const pulseRouteChartData = <?= $routeChartsJson ?>;
+        const pulseChartRegistry = { general: {}, routes: {} };
         window.pulseDashboard = () => ({
             labels: {
                 requests: 'Requests',
@@ -234,8 +243,16 @@ $escape = static fn (mixed $value): string => htmlspecialchars(
                 outbound: { visible: true, collapsed: false, view: 'table' },
                 exceptions: { visible: true, collapsed: false, view: 'table' }
             },
-            charts: {},
+            liveStats: pulseInitialLiveData.stats,
+            liveExceptions: pulseInitialLiveData.exceptions,
+            routeCards: pulseInitialLiveData.routeCards,
+            liveChartData: pulseInitialLiveData.chartData,
+            refreshSeconds: 0,
+            refreshTimer: null,
+            refreshing: false,
+            refreshError: false,
             expandedRoutes: {},
+            lastUpdated: pulseInitialLiveData.generatedAt,
             init() {
                 try {
                     const saved = JSON.parse(localStorage.getItem('pulse-dashboard-v2') || '{}');
@@ -244,6 +261,8 @@ $escape = static fn (mixed $value): string => htmlspecialchars(
                         this.order = [...new Set(saved.order.filter(id => known.includes(id)))];
                         this.order = this.order.concat(known.filter(id => !this.order.includes(id)));
                     }
+                    const savedRefresh = Number(saved.refreshSeconds);
+                    if ([0, 1, 2, 5].includes(savedRefresh)) this.refreshSeconds = savedRefresh;
                     if (saved.settings && typeof saved.settings === 'object') {
                         for (const id of known) {
                             const preference = saved.settings[id];
@@ -258,11 +277,18 @@ $escape = static fn (mixed $value): string => htmlspecialchars(
                     initializePulseTables();
                     this.initializeCharts();
                     this.initializeRouteCharts();
+                    this.startAutoRefresh();
                 });
             },
             persist() {
-                localStorage.setItem('pulse-dashboard-v2', JSON.stringify({ order: this.order, settings: this.settings }));
+                localStorage.setItem('pulse-dashboard-v2', JSON.stringify({
+                    order: this.order,
+                    settings: this.settings,
+                    refreshSeconds: this.refreshSeconds
+                }));
             },
+            formatNumber(value) { return new Intl.NumberFormat().format(Number(value) || 0); },
+            formatFixed(value, digits) { return (Number(value) || 0).toFixed(digits); },
             isVisible(id) { return this.settings[id].visible; },
             isCollapsed(id) { return this.settings[id].collapsed; },
             currentView(id) { return this.settings[id].view; },
@@ -274,7 +300,7 @@ $escape = static fn (mixed $value): string => htmlspecialchars(
             setView(id, view) {
                 this.settings[id].view = view;
                 this.persist();
-                this.$nextTick(() => this.charts[id]?.resize());
+                this.$nextTick(() => pulseChartRegistry.general[id]?.resize());
             },
             moveWidget(id, direction) {
                 const current = this.order.indexOf(id);
@@ -283,8 +309,63 @@ $escape = static fn (mixed $value): string => htmlspecialchars(
                 [this.order[current], this.order[next]] = [this.order[next], this.order[current]];
                 this.persist();
             },
+            setRefreshInterval(value) {
+                const interval = Number(value);
+                this.refreshSeconds = [0, 1, 2, 5].includes(interval) ? interval : 0;
+                this.persist();
+                this.startAutoRefresh();
+            },
+            startAutoRefresh() {
+                if (this.refreshTimer !== null) window.clearInterval(this.refreshTimer);
+                this.refreshTimer = null;
+                if (this.refreshSeconds === 0) return;
+                this.fetchMetrics();
+                this.refreshTimer = window.setInterval(
+                    () => this.fetchMetrics(),
+                    this.refreshSeconds * 1000
+                );
+            },
+            async fetchMetrics() {
+                if (this.refreshing) return;
+                this.refreshing = true;
+                try {
+                    const endpoint = new URL('dashboard-data.php', window.location.href);
+                    endpoint.search = window.location.search;
+                    const response = await fetch(endpoint, {
+                        cache: 'no-store',
+                        credentials: 'same-origin',
+                        headers: { Accept: 'application/json' }
+                    });
+                    if (!response.ok) throw new Error(`Metrics request failed: ${response.status}`);
+                    const snapshot = await response.json();
+
+                    this.liveStats = snapshot.stats;
+                    this.liveExceptions = snapshot.exceptions;
+                    this.liveChartData = snapshot.chartData;
+                    this.lastUpdated = snapshot.generatedAt;
+                    this.refreshError = false;
+
+                    for (const chart of Object.values(pulseChartRegistry.general)) chart.destroy();
+                    pulseChartRegistry.general = {};
+                    for (const chart of Object.values(pulseChartRegistry.routes)) chart.destroy();
+                    pulseChartRegistry.routes = {};
+                    this.routeCards = snapshot.routeCards;
+                    this.$nextTick(() => {
+                        this.initializeCharts();
+                        this.initializeRouteCharts();
+                        initializePulseTables();
+                    });
+                } catch (error) {
+                    this.refreshError = true;
+                    console.error('PulsePHP live refresh failed', error);
+                } finally {
+                    this.refreshing = false;
+                }
+            },
             initializeCharts() {
                 if (typeof Chart === 'undefined') return;
+                for (const chart of Object.values(pulseChartRegistry.general)) chart.destroy();
+                pulseChartRegistry.general = {};
                 const definitions = {
                     requests: { type: 'line', color: '#16805a' },
                     queries: { type: 'bar', color: '#d77a45' },
@@ -294,14 +375,14 @@ $escape = static fn (mixed $value): string => htmlspecialchars(
                 };
                 for (const [id, definition] of Object.entries(definitions)) {
                     const canvas = document.getElementById(`${id}-chart`);
-                    const data = pulseChartData[id];
+                    const data = this.liveChartData[id] || pulseChartData[id];
                     if (!canvas || !data) continue;
-                    this.charts[id] = new Chart(canvas, {
+                    pulseChartRegistry.general[id] = new Chart(canvas, {
                         type: definition.type,
                         data: {
-                            labels: data.labels,
+                            labels: [...data.labels],
                             datasets: [{
-                                data: data.values,
+                                data: [...data.values],
                                 borderColor: definition.color,
                                 backgroundColor: definition.type === 'line' ? `${definition.color}22` : `${definition.color}bb`,
                                 borderWidth: 2,
@@ -324,20 +405,20 @@ $escape = static fn (mixed $value): string => htmlspecialchars(
             },
             initializeRouteCharts() {
                 if (typeof Chart === 'undefined') return;
-                for (const [id, data] of Object.entries(pulseRouteChartData)) {
-                    const canvas = document.getElementById(`route-chart-${id}`);
+                for (const [id, card] of this.routeCards.entries()) {
+                    const canvas = document.getElementById(`route-chart-${card.chart_id}`);
                     const context = canvas?.getContext('2d');
                     if (!context) continue;
                     const gradient = context.createLinearGradient(0, 0, 0, 76);
-                    gradient.addColorStop(0, `${data.color}55`);
-                    gradient.addColorStop(1, `${data.color}00`);
-                    new Chart(context, {
+                    gradient.addColorStop(0, `${card.health.color}55`);
+                    gradient.addColorStop(1, `${card.health.color}00`);
+                    pulseChartRegistry.routes[card.chart_id] = new Chart(context, {
                         type: 'line',
                         data: {
-                            labels: data.labels,
+                            labels: card.timeline.map(point => point.timestamp),
                             datasets: [{
-                                data: data.values,
-                                borderColor: data.color,
+                                data: card.timeline.map(point => point.avg_duration_ms),
+                                borderColor: card.health.color,
                                 backgroundColor: gradient,
                                 borderWidth: 2,
                                 pointRadius: 0,
@@ -360,7 +441,11 @@ $escape = static fn (mixed $value): string => htmlspecialchars(
             document.querySelectorAll('table[data-sortable]').forEach(table => {
                 const body = table.tBodies[0];
                 if (!body) return;
-                let rows = Array.from(body.rows);
+                if (table._pulseTableController) {
+                    table._pulseTableController.sync();
+                    return;
+                }
+                let rows = Array.from(body.rows).filter(row => !row.hasAttribute('data-empty-row'));
                 const pageSize = 10;
                 let page = 0;
                 let sortColumn = -1;
@@ -381,20 +466,34 @@ $escape = static fn (mixed $value): string => htmlspecialchars(
                     pager.querySelector('[data-next]').disabled = page >= pageCount - 1;
                 };
 
+                const sortRows = () => {
+                    if (sortColumn < 0) return;
+                    const button = table.querySelector(`[data-sort-column="${sortColumn}"]`);
+                    const numeric = button?.dataset.sortType === 'number';
+                    rows.sort((left, right) => {
+                        const leftValue = left.cells[sortColumn]?.dataset.sortValue ?? left.cells[sortColumn]?.textContent.trim() ?? '';
+                        const rightValue = right.cells[sortColumn]?.dataset.sortValue ?? right.cells[sortColumn]?.textContent.trim() ?? '';
+                        const comparison = numeric
+                            ? (parseFloat(leftValue) || 0) - (parseFloat(rightValue) || 0)
+                            : leftValue.localeCompare(rightValue);
+                        return comparison * sortDirection;
+                    });
+                };
+
+                table._pulseTableController = {
+                    sync() {
+                        rows = Array.from(body.rows).filter(row => !row.hasAttribute('data-empty-row'));
+                        sortRows();
+                        render();
+                    }
+                };
+
                 table.querySelectorAll('[data-sort-column]').forEach(button => {
                     button.addEventListener('click', () => {
                         const column = Number(button.dataset.sortColumn);
                         sortDirection = sortColumn === column ? -sortDirection : 1;
                         sortColumn = column;
-                        const numeric = button.dataset.sortType === 'number';
-                        rows.sort((left, right) => {
-                            const leftValue = left.cells[column]?.dataset.sortValue ?? left.cells[column]?.textContent.trim() ?? '';
-                            const rightValue = right.cells[column]?.dataset.sortValue ?? right.cells[column]?.textContent.trim() ?? '';
-                            const comparison = numeric
-                                ? (parseFloat(leftValue) || 0) - (parseFloat(rightValue) || 0)
-                                : leftValue.localeCompare(rightValue);
-                            return comparison * sortDirection;
-                        });
+                        sortRows();
                         page = 0;
                         render();
                     });

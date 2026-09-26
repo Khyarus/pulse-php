@@ -11,13 +11,16 @@
                     <th class="px-3 py-2"><button data-sort-column="0">Time</button></th><th class="px-3 py-2"><button data-sort-column="1">Message</button></th>
                     <th class="px-3 py-2"><button data-sort-column="2">Location</button></th><th class="px-3 py-2"><button data-sort-column="3">Service</button></th><th class="px-3 py-2"><button data-sort-column="4">Route</button></th>
                 </tr></thead>
-                <tbody class="divide-y divide-[#edf0ee]">
-                    <?php foreach ($exceptions as $exception): ?><tr>
-                        <td class="mono whitespace-nowrap px-3 py-2"><?= $escape($exception['created_at']) ?></td>
-                        <td class="max-w-96 break-words px-3 py-2 text-[#9d482e]"><?= $escape($exception['message']) ?></td>
-                        <td class="mono max-w-72 break-all px-3 py-2"><?= $escape($exception['file']) ?>:<?= $escape($exception['line']) ?></td>
-                        <td class="px-3 py-2"><?= $escape($exception['service']) ?></td><td class="px-3 py-2"><?= $escape($exception['route']) ?></td>
-                    </tr><?php endforeach; ?>
+                    <template x-for="exception in liveExceptions" :key="exception.created_at + exception.message">
+                        <tr>
+                            <td class="mono whitespace-nowrap px-3 py-2" x-text="exception.created_at"></td>
+                            <td class="max-w-96 break-words px-3 py-2 text-[#9d482e]" x-text="exception.message"></td>
+                            <td class="mono max-w-72 break-all px-3 py-2" x-text="exception.file + ':' + exception.line"></td>
+                            <td class="px-3 py-2" x-text="exception.service"></td>
+                            <td class="px-3 py-2" x-text="exception.route"></td>
+                        </tr>
+                    </template>
+                    <template x-if="liveExceptions.length === 0"><tr data-empty-row><td colspan="5" class="px-3 py-8 text-center text-[#89968f]">No exceptions in this scope.</td></tr></template>
                     <?php if ($exceptions === []): ?><tr><td colspan="5" class="px-3 py-8 text-center text-[#89968f]">No exceptions in this scope.</td></tr><?php endif; ?>
                 </tbody>
             </table>

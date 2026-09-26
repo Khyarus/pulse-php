@@ -126,10 +126,11 @@ final class DashboardAuthTest extends TestCase
         self::assertStringContainsString('value="orders-api" selected', $html);
         self::assertStringContainsString('value="orders.show" selected', $html);
         self::assertStringContainsString('Rotas &amp; APIs Monitoradas', $html);
-        self::assertStringContainsString('data-severity="healthy"', $html);
-        self::assertStringContainsString('data-severity="critical"', $html);
-        self::assertStringContainsString('data-method="GET"', $html);
-        self::assertStringContainsString('Unhandled exceptions: 1', $html);
+        self::assertStringContainsString(':data-severity="card.health.key"', $html);
+        self::assertStringContainsString('"key":"healthy"', $html);
+        self::assertStringContainsString('"key":"critical"', $html);
+        self::assertStringContainsString(':data-method="card.method"', $html);
+        self::assertStringContainsString('"unhandled_exceptions":1', $html);
         self::assertStringContainsString('/orders/42', $html);
         self::assertStringNotContainsString('/catalog/search', $html);
         self::assertStringContainsString('pulse-dashboard-v2', $html);
@@ -158,8 +159,25 @@ final class DashboardAuthTest extends TestCase
             (new Dashboard($this->dbPath))->authorize(static fn (): bool => true)
         );
 
-        self::assertStringContainsString('data-severity="warning"', $html);
-        self::assertStringContainsString('data-method="PUT"', $html);
+        self::assertStringContainsString('"key":"warning"', $html);
+        self::assertStringContainsString('"method":"PUT"', $html);
+    }
+
+    public function test_it_protects_the_live_json_snapshot_and_returns_dashboard_data(): void
+    {
+        [$deniedStatus, $denied] = $this->renderJson(new Dashboard($this->dbPath));
+        self::assertSame(403, $deniedStatus);
+        self::assertSame(['error' => 'Access denied'], $denied);
+
+        [$allowedStatus, $snapshot] = $this->renderJson(
+            (new Dashboard($this->dbPath))->authorize(static fn (): bool => true)
+        );
+        self::assertSame(200, $allowedStatus);
+        self::assertArrayHasKey('stats', $snapshot);
+        self::assertArrayHasKey('chartData', $snapshot);
+        self::assertArrayHasKey('routeCards', $snapshot);
+        self::assertArrayHasKey('exceptions', $snapshot);
+        self::assertArrayHasKey('generatedAt', $snapshot);
     }
 
     /** @return array{int, string} */
@@ -171,5 +189,16 @@ final class DashboardAuthTest extends TestCase
         $html = (string) ob_get_clean();
 
         return [http_response_code(), $html];
+    }
+
+    /** @return array{int, array<string, mixed>} */
+    private function renderJson(Dashboard $dashboard): array
+    {
+        http_response_code(200);
+        ob_start();
+        $dashboard->renderJson();
+        $json = (string) ob_get_clean();
+
+        return [http_response_code(), json_decode($json, true, 512, JSON_THROW_ON_ERROR)];
     }
 }

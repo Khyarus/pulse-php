@@ -67,6 +67,10 @@ php -S 127.0.0.1:8000 -t public
 
 Acesse `http://127.0.0.1:8000/dashboard.php`. O exemplo restringe o acesso a `127.0.0.1` e `::1`; quando as variáveis Basic Auth estão configuradas, as credenciais também são exigidas. As políticas são cumulativas. Não exponha o endpoint publicamente sem configurar autenticação, restrições de rede e HTTPS.
 
+Para gerar tráfego local contínuo em outra janela do terminal, execute `php traffic.php` e interrompa com `Ctrl+C`. Para uma execução controlada, use `php traffic.php --iterations=10`. O script grava cada request imediatamente em `storage/database.sqlite`.
+
+No Dashboard, selecione `1s`, `2s` ou `5s` em **Auto-Refresh (Ao vivo)** para atualizar contadores, rotas, sparklines e exceções sem recarregar a página. O intervalo fica salvo no navegador.
+
 Aplicações que instanciam o Dashboard diretamente devem configurar pelo menos uma política. Por exemplo:
 
 ```php

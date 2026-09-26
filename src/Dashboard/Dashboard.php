@@ -68,6 +68,60 @@ final class Dashboard
             return;
         }
 
+        extract($this->collectDashboardData(), EXTR_SKIP);
+
+        if (!headers_sent()) {
+            header('Content-Type: text/html; charset=UTF-8');
+            header('Cache-Control: no-store, private');
+        }
+
+        $requestCount = number_format($stats['requests_total']);
+        $averageDuration = number_format($stats['avg_response_ms'], 2);
+        $peakMemory = number_format($stats['peak_memory_bytes'] / 1_048_576, 1);
+        $exceptionCount = number_format($stats['exceptions_total']);
+        $periodLabel = $periods[$period];
+        $liveDataJson = json_encode([
+            'stats' => $stats,
+            'chartData' => $chartData,
+            'routeCards' => $routeCards,
+            'exceptions' => $exceptions,
+            'generatedAt' => gmdate('c'),
+        ], JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_THROW_ON_ERROR);
+
+        require __DIR__ . '/resources/views/dashboard.php';
+    }
+
+    public function renderJson(): void
+    {
+        $denialStatus = $this->getDenialStatus();
+        if (!headers_sent()) {
+            header('Content-Type: application/json; charset=UTF-8');
+            header('Cache-Control: no-store, private');
+            if ($denialStatus === 401) {
+                header('WWW-Authenticate: Basic realm="PulsePHP Dashboard", charset="UTF-8"');
+            }
+        }
+
+        if ($denialStatus !== null) {
+            http_response_code($denialStatus);
+            echo json_encode(['error' => 'Access denied'], JSON_THROW_ON_ERROR);
+
+            return;
+        }
+
+        $data = $this->collectDashboardData();
+        echo json_encode([
+            'stats' => $data['stats'],
+            'chartData' => $data['chartData'],
+            'routeCards' => $data['routeCards'],
+            'exceptions' => $data['exceptions'],
+            'generatedAt' => gmdate('c'),
+        ], JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_THROW_ON_ERROR);
+    }
+
+    /** @return array<string, mixed> */
+    private function collectDashboardData(): array
+    {
         $periods = [
             '15m' => 'Last 15 minutes',
             '1h' => 'Last hour',
@@ -110,7 +164,11 @@ final class Dashboard
                 $metric['method'],
                 5
             );
-            $chartId = (string) count($routeCards);
+            $chartId = substr(
+                hash('sha256', $metric['service'] . "\0" . $metric['route'] . "\0" . $metric['method']),
+                0,
+                16
+            );
             $metric['chart_id'] = $chartId;
             $routeCharts[$chartId] = [
                 'labels' => array_column($metric['timeline'], 'timestamp'),
@@ -169,18 +227,26 @@ final class Dashboard
             JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_THROW_ON_ERROR
         );
 
-        if (!headers_sent()) {
-            header('Content-Type: text/html; charset=UTF-8');
-            header('Cache-Control: no-store, private');
-        }
-
-        $requestCount = number_format($stats['requests_total']);
-        $averageDuration = number_format($stats['avg_response_ms'], 2);
-        $peakMemory = number_format($stats['peak_memory_bytes'] / 1_048_576, 1);
-        $exceptionCount = number_format($stats['exceptions_total']);
-        $periodLabel = $periods[$period];
-
-        require __DIR__ . '/resources/views/dashboard.php';
+        return compact(
+            'periods',
+            'period',
+            'services',
+            'selectedService',
+            'routes',
+            'selectedRoute',
+            'stats',
+            'timeline',
+            'exceptionTimeline',
+            'slowQueries',
+            'spans',
+            'outboundRequests',
+            'requests',
+            'exceptions',
+            'routeCards',
+            'routeChartsJson',
+            'chartData',
+            'chartsJson'
+        );
     }
 
     /** @param array<string, string> $periods */
