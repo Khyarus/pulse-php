@@ -23,18 +23,24 @@ final class Pulse
         'exceptions' => [],
         'requests' => [],
         'queries' => [],
+        'outbound_requests' => [],
     ];
 
-    /** @var array<string, array{started_at: int, memory: int}> */
+    /** @var array<string, array{started_at: int, memory: int, service: string, route: string}> */
     private array $timers = [];
 
     private ?RequestCollector $requestCollector;
+    private string $service = 'default';
+    private string $route = '/';
 
     private function __construct(
         private StorageInterface $storage,
-        bool $registerStandaloneCollectors
+        bool $registerStandaloneCollectors,
+        string $serviceName
     )
     {
+        $this->setContext($serviceName, $this->routeFromRequest());
+
         if ($registerStandaloneCollectors) {
             (new ExceptionCollector($this))->register();
             $this->requestCollector = new RequestCollector($this);
@@ -45,15 +51,32 @@ final class Pulse
         register_shutdown_function([$this, 'flush']);
     }
 
-    public static function init(string $dbPath, bool $registerStandaloneCollectors = true): self
+    public static function init(
+        string $dbPath,
+        bool $registerStandaloneCollectors = true,
+        ?string $serviceName = null
+    ): self
     {
         if (self::$instance !== null) {
             return self::$instance;
         }
 
-        self::$instance = new self(new SQLiteStorage($dbPath), $registerStandaloneCollectors);
+        $serviceName ??= (string) (getenv('PULSE_SERVICE_NAME') ?: getenv('APP_NAME') ?: 'default');
+        self::$instance = new self(
+            new SQLiteStorage($dbPath),
+            $registerStandaloneCollectors,
+            $serviceName
+        );
 
         return self::$instance;
+    }
+
+    public function setContext(string $service, ?string $route = null): void
+    {
+        $this->service = trim($service) !== '' ? trim($service) : 'default';
+        if ($route !== null) {
+            $this->route = trim($route) !== '' ? trim($route) : '/';
+        }
     }
 
     public static function getInstance(): self
@@ -76,6 +99,8 @@ final class Pulse
             'name' => $name,
             'value' => $value,
             'tags' => $tags,
+            'service' => $this->service,
+            'route' => $this->route,
         ];
     }
 
@@ -84,6 +109,8 @@ final class Pulse
         $this->timers[$key] = [
             'started_at' => hrtime(true),
             'memory' => memory_get_usage(true),
+            'service' => $this->service,
+            'route' => $this->route,
         ];
     }
 
@@ -100,6 +127,8 @@ final class Pulse
             'name' => $key,
             'duration_ms' => (hrtime(true) - $timer['started_at']) / 1_000_000,
             'memory_bytes' => max(0, memory_get_usage(true) - $timer['memory']),
+            'service' => $timer['service'],
+            'route' => $timer['route'],
         ];
     }
 
@@ -110,6 +139,8 @@ final class Pulse
             'file' => $exception->getFile(),
             'line' => $exception->getLine(),
             'trace' => $exception->getTraceAsString(),
+            'service' => $this->service,
+            'route' => $this->route,
         ];
     }
 
@@ -119,7 +150,9 @@ final class Pulse
         int $status,
         float $duration,
         int $memory,
-        ?string $ip = null
+        ?string $ip = null,
+        ?string $service = null,
+        ?string $route = null
     ): void {
         $this->buffer['requests'][] = [
             'url' => $url,
@@ -128,6 +161,8 @@ final class Pulse
             'duration_ms' => $duration,
             'memory_bytes' => $memory,
             'ip' => $ip,
+            'service' => $service ?? $this->service,
+            'route' => $route ?? $this->route,
         ];
     }
 
@@ -138,6 +173,35 @@ final class Pulse
             'hash' => CatalogEngine::hashSql($normalizedSql),
             'normalized_sql' => $normalizedSql,
             'duration_ms' => $durationMs,
+            'service' => $this->service,
+            'route' => $this->route,
+        ];
+    }
+
+    public function recordOutboundRequest(
+        string $url,
+        string $method,
+        int $statusCode,
+        float $durationMs
+    ): void {
+        $parts = parse_url($url);
+        $host = is_array($parts) ? strtolower((string) ($parts['host'] ?? 'unknown')) : 'unknown';
+        $safeUrl = $this->sanitizeOutboundUrl($parts);
+
+        $this->buffer['spans'][] = [
+            'name' => 'http.outbound:' . $host,
+            'duration_ms' => max(0.0, $durationMs),
+            'memory_bytes' => 0,
+            'service' => $this->service,
+            'route' => $this->route,
+        ];
+        $this->buffer['outbound_requests'][] = [
+            'service' => $this->service,
+            'route' => $this->route,
+            'method' => strtoupper($method),
+            'status_code' => $statusCode,
+            'url' => $safeUrl,
+            'duration_ms' => max(0.0, $durationMs),
         ];
     }
 
@@ -151,6 +215,7 @@ final class Pulse
             'exceptions' => [],
             'requests' => [],
             'queries' => [],
+            'outbound_requests' => [],
         ]) {
             return;
         }
@@ -162,6 +227,7 @@ final class Pulse
             'exceptions' => [],
             'requests' => [],
             'queries' => [],
+            'outbound_requests' => [],
         ];
 
         try {
@@ -170,5 +236,27 @@ final class Pulse
             $this->buffer = array_merge_recursive($buffer, $this->buffer);
             throw $exception;
         }
+    }
+
+    private function routeFromRequest(): string
+    {
+        $path = parse_url((string) ($_SERVER['REQUEST_URI'] ?? '/'), PHP_URL_PATH);
+
+        return is_string($path) && $path !== '' ? $path : '/';
+    }
+
+    /** @param array<string, mixed>|false $parts */
+    private function sanitizeOutboundUrl(array|false $parts): string
+    {
+        if ($parts === false || !isset($parts['host'])) {
+            return '[invalid-url]';
+        }
+
+        $scheme = strtolower((string) ($parts['scheme'] ?? 'https'));
+        $host = strtolower((string) $parts['host']);
+        $port = isset($parts['port']) ? ':' . $parts['port'] : '';
+        $path = (string) ($parts['path'] ?? '/');
+
+        return $scheme . '://' . $host . $port . $path;
     }
 }

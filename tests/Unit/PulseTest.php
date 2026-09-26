@@ -9,6 +9,7 @@ use PHPUnit\Framework\TestCase;
 use PulsePHP\Pulse;
 use PulsePHP\Storage\SQLiteStorage;
 use ReflectionProperty;
+use RuntimeException;
 
 final class PulseTest extends TestCase
 {
@@ -54,5 +55,41 @@ final class PulseTest extends TestCase
         self::assertSame('email.send', $span['name']);
         self::assertGreaterThanOrEqual(0, (float) $span['duration_ms']);
         self::assertGreaterThanOrEqual(0, (int) $span['memory_bytes']);
+    }
+
+    public function test_it_attaches_service_and_route_context_to_telemetry(): void
+    {
+        $pulse = Pulse::init(':memory:', false, 'billing-service');
+        $pulse->setContext('billing-service', 'orders.create');
+        $pulse->recordMetric('orders.created', 1.0);
+        $pulse->recordQuery('SELECT 1', 0.5);
+        $pulse->recordRequest('/orders', 'POST', 201, 2.0, 128);
+        $pulse->recordException(new RuntimeException('sample failure'));
+        $pulse->startTimer('order.persist');
+        $pulse->endTimer('order.persist');
+        $pulse->recordOutboundRequest('https://user:secret@example.test/pay?token=hidden', 'post', 201, 9.0);
+        $pulse->flush();
+
+        $storage = (new ReflectionProperty(Pulse::class, 'storage'))->getValue($pulse);
+        $pdo = (new ReflectionProperty(SQLiteStorage::class, 'pdo'))->getValue($storage);
+
+        foreach ([
+            'pulse_metrics',
+            'pulse_queries',
+            'pulse_requests',
+            'pulse_exceptions',
+            'pulse_spans',
+            'pulse_outbound_requests',
+        ] as $table) {
+            $record = $pdo->query("SELECT service, route FROM {$table} LIMIT 1")->fetch(PDO::FETCH_ASSOC);
+            self::assertSame('billing-service', $record['service'], $table);
+            self::assertSame('orders.create', $record['route'], $table);
+        }
+
+        $outbound = $pdo->query('SELECT method, status_code, url FROM pulse_outbound_requests')
+            ->fetch(PDO::FETCH_ASSOC);
+        self::assertSame('POST', $outbound['method']);
+        self::assertSame(201, (int) $outbound['status_code']);
+        self::assertSame('https://example.test/pay', $outbound['url']);
     }
 }

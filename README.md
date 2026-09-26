@@ -15,9 +15,13 @@ PulsePHP registra eventos, métricas, tempos de execução, requisições, exce�
 - Normalização e catalogação de SQL para agrupar consultas com valores diferentes.
 - Timers para medir duração e variação de memória de operações.
 - Captura de exceções e, em requisições web, dados de requisição.
-- Dashboard HTML com atividade, consultas lentas, spans e exceções recentes.
+- Contexto de serviço e rota associado a requisições, métricas, spans, queries e exceções.
+- Captura automática de chamadas feitas pelo cliente HTTP `Http` do Laravel, incluindo método, status, destino e duração.
+- Dashboard com filtros de período/serviço/rota, gráficos ou tabelas ordenáveis e widgets reordenáveis, recolhíveis e ocultáveis.
 - Acesso ao Dashboard negado por padrão; políticas podem combinar Basic Auth, IPs permitidos e callback ou Gate do Laravel.
 - Integração opcional com Laravel 9+ sem dependência `illuminate/*` no uso standalone.
+
+No PHP standalone, requisições web e exceções são capturadas pelos coletores registrados por `Pulse::init()`. A captura automática de SQL é feita pela integração Laravel; em PHP puro, registre a consulta explicitamente com `Pulse::getInstance()->recordQuery($sql, $durationMs)`. Chamadas outbound também precisam passar pelo cliente HTTP do Laravel para serem interceptadas automaticamente; Guzzle usado diretamente não é interceptado.
 
 ## Requisitos e instalação
 
@@ -83,6 +87,8 @@ php artisan vendor:publish --tag=pulse-config
 
 Por padrão, o Dashboard fica na rota `/pulse` e o banco em `storage/pulse.sqlite`. Para alterar o caminho do banco, edite `database_path` em `config/pulse.php`.
 
+As rotas web e API recebem contexto com o nome da rota resolvida ou seu URI. O serviço usa `PULSE_SERVICE_NAME`, com fallback para `APP_NAME` e depois `default`. Bancos SQLite v1 existentes recebem as novas colunas na inicialização, sem apagar os registros anteriores.
+
 O acesso permanece negado até a aplicação definir o Gate `viewPulse`, por exemplo em um provider de autorização:
 
 ```php
@@ -97,9 +103,14 @@ Opcionalmente, configure Basic Auth e uma lista de IPs permitidos no `.env`:
 PULSE_DASHBOARD_USER=pulse-admin
 PULSE_DASHBOARD_PASSWORD=use-um-segredo-forte
 PULSE_DASHBOARD_IPS=127.0.0.1,::1
+PULSE_SERVICE_NAME=orders-api
 ```
 
 Quando configuradas, as credenciais e a whitelist são verificadas além do Gate. O arquivo publicado também permite ajustar `enabled`, rota, middleware e coletores.
+
+As chamadas feitas por `Illuminate\Support\Facades\Http` são registradas pelos eventos do cliente HTTP do Laravel. Cada chamada aparece como span `http.outbound:{host}` e também na tabela de chamadas outbound, com método, status e duração. Por segurança, credenciais e query string são removidas da URL persistida. Ative ou desative essa captura em `collect_outbound_requests`.
+
+O Dashboard filtra por período (15 minutos, 1 hora, 24 horas ou 7 dias), serviço e rota. Cada widget alterna entre gráfico e tabela; tabelas permitem ordenação e paginação. Visibilidade, ordem, recolhimento e visualização são salvos no `localStorage` do navegador.
 
 ## Testes
 

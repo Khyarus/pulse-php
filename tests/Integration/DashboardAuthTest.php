@@ -19,12 +19,14 @@ final class DashboardAuthTest extends TestCase
         $this->dbPath = $path;
         new SQLiteStorage($this->dbPath);
         $_SERVER['REMOTE_ADDR'] = '127.0.0.1';
+        $_GET = [];
         unset($_SERVER['PHP_AUTH_USER'], $_SERVER['PHP_AUTH_PW'], $_SERVER['HTTP_AUTHORIZATION']);
     }
 
     protected function tearDown(): void
     {
         unset($_SERVER['PHP_AUTH_USER'], $_SERVER['PHP_AUTH_PW'], $_SERVER['HTTP_AUTHORIZATION']);
+        $_GET = [];
         if (isset($this->dbPath) && is_file($this->dbPath)) {
             unlink($this->dbPath);
         }
@@ -74,6 +76,44 @@ final class DashboardAuthTest extends TestCase
         );
         self::assertSame(200, $allowedStatus);
         self::assertStringContainsString('Application pulse', $html);
+    }
+
+    public function test_it_filters_dashboard_data_by_service_and_route(): void
+    {
+        $storage = new SQLiteStorage($this->dbPath);
+        $storage->writeBatch([
+            'requests' => [
+                [
+                    'url' => '/orders/42', 'method' => 'GET', 'status_code' => 200,
+                    'duration_ms' => 12.0, 'memory_bytes' => 1024, 'ip' => '127.0.0.1',
+                    'service' => 'orders-api', 'route' => 'orders.show',
+                ],
+                [
+                    'url' => '/catalog/search', 'method' => 'GET', 'status_code' => 200,
+                    'duration_ms' => 25.0, 'memory_bytes' => 1024, 'ip' => '127.0.0.1',
+                    'service' => 'catalog-api', 'route' => 'catalog.search',
+                ],
+            ],
+        ]);
+        unset($storage);
+        $_GET = [
+            'period' => '24h',
+            'service' => 'orders-api',
+            'route' => 'orders.show',
+        ];
+
+        [$status, $html] = $this->render(
+            (new Dashboard($this->dbPath))->authorize(static fn (): bool => true)
+        );
+
+        self::assertSame(200, $status);
+        self::assertStringContainsString('value="24h" selected', $html);
+        self::assertStringContainsString('value="orders-api" selected', $html);
+        self::assertStringContainsString('value="orders.show" selected', $html);
+        self::assertStringContainsString('/orders/42', $html);
+        self::assertStringNotContainsString('/catalog/search', $html);
+        self::assertStringContainsString('pulse-dashboard-v2', $html);
+        self::assertStringContainsString('data-sortable', $html);
     }
 
     /** @return array{int, string} */

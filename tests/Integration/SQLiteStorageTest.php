@@ -27,6 +27,7 @@ final class SQLiteStorageTest extends TestCase
             'pulse_requests',
             'pulse_catalog',
             'pulse_queries',
+            'pulse_outbound_requests',
         ], $tables);
 
         $storage->writeBatch([
@@ -51,9 +52,19 @@ final class SQLiteStorageTest extends TestCase
                 'normalized_sql' => 'SELECT 1',
                 'duration_ms' => 0.8,
             ]],
+            'outbound_requests' => [[
+                'service' => 'billing-api',
+                'route' => 'checkout',
+                'method' => 'GET',
+                'status_code' => 200,
+                'url' => 'https://example.test/health',
+                'duration_ms' => 8.4,
+            ]],
         ]);
 
-        foreach (['metrics', 'spans', 'exceptions', 'requests', 'catalog', 'queries'] as $table) {
+        foreach ([
+            'metrics', 'spans', 'exceptions', 'requests', 'catalog', 'queries', 'outbound_requests',
+        ] as $table) {
             self::assertSame(1, (int) $pdo->query("SELECT COUNT(*) FROM pulse_{$table}")->fetchColumn());
         }
         self::assertSame(
@@ -61,5 +72,48 @@ final class SQLiteStorageTest extends TestCase
             json_decode((string) $pdo->query('SELECT tags FROM pulse_metrics')->fetchColumn(), true)
         );
         self::assertSame(1, (int) $pdo->query('SELECT COUNT(*) FROM pulse_queries WHERE catalog_id = 1')->fetchColumn());
+        $outbound = $pdo->query(
+            'SELECT service, route, method, status_code, url FROM pulse_outbound_requests'
+        )->fetch(PDO::FETCH_ASSOC);
+        self::assertSame('billing-api', $outbound['service']);
+        self::assertSame('checkout', $outbound['route']);
+        self::assertSame('GET', $outbound['method']);
+        self::assertSame(200, (int) $outbound['status_code']);
+    }
+
+    public function test_it_migrates_a_v1_database_without_losing_rows(): void
+    {
+        $dbPath = tempnam(sys_get_temp_dir(), 'pulse-v1-');
+        self::assertNotFalse($dbPath);
+
+        try {
+            $legacyPdo = new PDO('sqlite:' . $dbPath);
+            $legacyPdo->exec(
+                'CREATE TABLE pulse_requests ('
+                . 'id INTEGER PRIMARY KEY AUTOINCREMENT, url TEXT NOT NULL, method TEXT NOT NULL, '
+                . 'status_code INTEGER NOT NULL, duration_ms REAL NOT NULL, memory_bytes INTEGER NOT NULL, '
+                . 'ip TEXT, created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP)'
+            );
+            $legacyPdo->exec(
+                "INSERT INTO pulse_requests (url, method, status_code, duration_ms, memory_bytes, ip) "
+                . "VALUES ('/legacy', 'GET', 200, 1.5, 128, '127.0.0.1')"
+            );
+            unset($legacyPdo);
+
+            new SQLiteStorage($dbPath);
+
+            $migratedPdo = new PDO('sqlite:' . $dbPath);
+            $request = $migratedPdo->query(
+                'SELECT url, service, route FROM pulse_requests WHERE id = 1'
+            )->fetch(PDO::FETCH_ASSOC);
+            self::assertSame('/legacy', $request['url']);
+            self::assertSame('default', $request['service']);
+            self::assertSame('/', $request['route']);
+            unset($migratedPdo);
+        } finally {
+            if (is_file($dbPath)) {
+                unlink($dbPath);
+            }
+        }
     }
 }

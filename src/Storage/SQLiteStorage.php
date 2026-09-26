@@ -31,7 +31,9 @@ final class SQLiteStorage implements StorageInterface
             throw new RuntimeException('Unable to read the PulsePHP database schema.');
         }
 
+        $this->migrateContextColumns();
         $this->pdo->exec($schema);
+        $this->migrateContextColumns();
     }
 
     /** @param array<string, list<array<string, mixed>>> $buffer */
@@ -49,6 +51,7 @@ final class SQLiteStorage implements StorageInterface
             $this->writeExceptions($buffer['exceptions'] ?? []);
             $this->writeRequests($buffer['requests'] ?? []);
             $this->writeQueries($buffer['queries'] ?? []);
+            $this->writeOutboundRequests($buffer['outbound_requests'] ?? []);
             $this->pdo->commit();
         } catch (Throwable $exception) {
             if ($this->pdo->inTransaction()) {
@@ -62,7 +65,8 @@ final class SQLiteStorage implements StorageInterface
     private function writeMetrics(array $metrics): void
     {
         $statement = $this->pdo->prepare(
-            'INSERT INTO pulse_metrics (name, value, tags) VALUES (:name, :value, :tags)'
+            'INSERT INTO pulse_metrics (name, value, tags, service, route) '
+            . 'VALUES (:name, :value, :tags, :service, :route)'
         );
 
         foreach ($metrics as $metric) {
@@ -70,6 +74,8 @@ final class SQLiteStorage implements StorageInterface
                 ':name' => $metric['name'],
                 ':value' => $metric['value'],
                 ':tags' => json_encode($metric['tags'] ?? [], JSON_THROW_ON_ERROR),
+                ':service' => $metric['service'] ?? 'default',
+                ':route' => $metric['route'] ?? '/',
             ]);
         }
     }
@@ -77,8 +83,8 @@ final class SQLiteStorage implements StorageInterface
     private function writeSpans(array $spans): void
     {
         $statement = $this->pdo->prepare(
-            'INSERT INTO pulse_spans (name, duration_ms, memory_bytes) '
-            . 'VALUES (:name, :duration_ms, :memory_bytes)'
+            'INSERT INTO pulse_spans (name, duration_ms, memory_bytes, service, route) '
+            . 'VALUES (:name, :duration_ms, :memory_bytes, :service, :route)'
         );
 
         foreach ($spans as $span) {
@@ -86,6 +92,8 @@ final class SQLiteStorage implements StorageInterface
                 ':name' => $span['name'],
                 ':duration_ms' => $span['duration_ms'],
                 ':memory_bytes' => $span['memory_bytes'],
+                ':service' => $span['service'] ?? 'default',
+                ':route' => $span['route'] ?? '/',
             ]);
         }
     }
@@ -93,8 +101,8 @@ final class SQLiteStorage implements StorageInterface
     private function writeExceptions(array $exceptions): void
     {
         $statement = $this->pdo->prepare(
-            'INSERT INTO pulse_exceptions (message, file, line, trace) '
-            . 'VALUES (:message, :file, :line, :trace)'
+            'INSERT INTO pulse_exceptions (message, file, line, trace, service, route) '
+            . 'VALUES (:message, :file, :line, :trace, :service, :route)'
         );
 
         foreach ($exceptions as $exception) {
@@ -103,6 +111,8 @@ final class SQLiteStorage implements StorageInterface
                 ':file' => $exception['file'],
                 ':line' => $exception['line'],
                 ':trace' => $exception['trace'],
+                ':service' => $exception['service'] ?? 'default',
+                ':route' => $exception['route'] ?? '/',
             ]);
         }
     }
@@ -111,8 +121,8 @@ final class SQLiteStorage implements StorageInterface
     {
         $statement = $this->pdo->prepare(
             'INSERT INTO pulse_requests '
-            . '(url, method, status_code, duration_ms, memory_bytes, ip) '
-            . 'VALUES (:url, :method, :status_code, :duration_ms, :memory_bytes, :ip)'
+            . '(url, method, status_code, duration_ms, memory_bytes, ip, service, route) '
+            . 'VALUES (:url, :method, :status_code, :duration_ms, :memory_bytes, :ip, :service, :route)'
         );
 
         foreach ($requests as $request) {
@@ -123,6 +133,28 @@ final class SQLiteStorage implements StorageInterface
                 ':duration_ms' => $request['duration_ms'],
                 ':memory_bytes' => $request['memory_bytes'],
                 ':ip' => $request['ip'],
+                ':service' => $request['service'] ?? 'default',
+                ':route' => $request['route'] ?? '/',
+            ]);
+        }
+    }
+
+    private function writeOutboundRequests(array $requests): void
+    {
+        $statement = $this->pdo->prepare(
+            'INSERT INTO pulse_outbound_requests '
+            . '(service, route, method, status_code, url, duration_ms) '
+            . 'VALUES (:service, :route, :method, :status_code, :url, :duration_ms)'
+        );
+
+        foreach ($requests as $request) {
+            $statement->execute([
+                ':service' => $request['service'] ?? 'default',
+                ':route' => $request['route'] ?? '/',
+                ':method' => $request['method'],
+                ':status_code' => $request['status_code'] ?? 0,
+                ':url' => $request['url'],
+                ':duration_ms' => $request['duration_ms'],
             ]);
         }
     }
@@ -137,8 +169,8 @@ final class SQLiteStorage implements StorageInterface
             'SELECT id FROM pulse_catalog WHERE hash = :hash'
         );
         $queryStatement = $this->pdo->prepare(
-            'INSERT INTO pulse_queries (catalog_id, duration_ms) '
-            . 'VALUES (:catalog_id, :duration_ms)'
+            'INSERT INTO pulse_queries (catalog_id, duration_ms, service, route) '
+            . 'VALUES (:catalog_id, :duration_ms, :service, :route)'
         );
 
         foreach ($queries as $query) {
@@ -156,7 +188,40 @@ final class SQLiteStorage implements StorageInterface
             $queryStatement->execute([
                 ':catalog_id' => (int) $catalogId,
                 ':duration_ms' => $query['duration_ms'],
+                ':service' => $query['service'] ?? 'default',
+                ':route' => $query['route'] ?? '/',
             ]);
+        }
+    }
+
+    private function migrateContextColumns(): void
+    {
+        $tables = [
+            'pulse_metrics',
+            'pulse_spans',
+            'pulse_exceptions',
+            'pulse_requests',
+            'pulse_queries',
+        ];
+        $definitions = [
+            'service' => "TEXT NOT NULL DEFAULT 'default'",
+            'route' => "TEXT NOT NULL DEFAULT '/'",
+        ];
+
+        foreach ($tables as $table) {
+            $columns = $this->pdo->query('PRAGMA table_info(' . $table . ')')
+                ->fetchAll(PDO::FETCH_COLUMN, 1);
+            if ($columns === []) {
+                continue;
+            }
+
+            foreach ($definitions as $column => $definition) {
+                if (!in_array($column, $columns, true)) {
+                    $this->pdo->exec(
+                        sprintf('ALTER TABLE %s ADD COLUMN %s %s', $table, $column, $definition)
+                    );
+                }
+            }
         }
     }
 }

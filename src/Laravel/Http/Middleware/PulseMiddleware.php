@@ -20,11 +20,21 @@ final class PulseMiddleware
 
         $collectRequests = (bool) config('pulse.collect_requests', true);
         $collectExceptions = (bool) config('pulse.collect_exceptions', true);
+        $pulse = app(Pulse::class);
+        $matchedRoute = $request->route();
+        $routeName = is_object($matchedRoute) && method_exists($matchedRoute, 'getName')
+            ? $matchedRoute->getName()
+            : null;
+        $routeUri = is_object($matchedRoute) && method_exists($matchedRoute, 'uri')
+            ? $matchedRoute->uri()
+            : null;
+        $routeContext = $routeName ?: $routeUri ?: '/' . ltrim($request->path(), '/');
+        $pulse->setContext((string) config('pulse.service_name', 'default'), $routeContext);
+
         if (!$collectRequests && !$collectExceptions) {
             return $next($request);
         }
 
-        $pulse = app(Pulse::class);
         $startedAt = hrtime(true);
         $memoryAtStart = memory_get_usage(true);
 
