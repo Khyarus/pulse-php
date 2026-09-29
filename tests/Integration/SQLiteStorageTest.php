@@ -81,6 +81,39 @@ final class SQLiteStorageTest extends TestCase
         self::assertSame(200, (int) $outbound['status_code']);
     }
 
+    public function test_it_configures_concurrency_pragmas_on_disk_databases(): void
+    {
+        $dbPath = tempnam(sys_get_temp_dir(), 'pulse-pragma-');
+        self::assertNotFalse($dbPath);
+
+        try {
+            $storage = new SQLiteStorage($dbPath);
+            $pdo = (new ReflectionProperty(SQLiteStorage::class, 'pdo'))->getValue($storage);
+            self::assertInstanceOf(PDO::class, $pdo);
+
+            self::assertSame(5000, (int) $pdo->query('PRAGMA busy_timeout')->fetchColumn());
+            self::assertSame('wal', strtolower((string) $pdo->query('PRAGMA journal_mode')->fetchColumn()));
+        } finally {
+            unset($pdo, $storage);
+            foreach ([$dbPath, $dbPath . '-wal', $dbPath . '-shm'] as $artifact) {
+                if (is_file($artifact)) {
+                    unlink($artifact);
+                }
+            }
+        }
+    }
+
+    public function test_it_does_not_enable_wal_for_in_memory_databases(): void
+    {
+        $storage = new SQLiteStorage(':memory:');
+        $pdo = (new ReflectionProperty(SQLiteStorage::class, 'pdo'))->getValue($storage);
+        self::assertInstanceOf(PDO::class, $pdo);
+
+        // busy_timeout still applies, but journal_mode stays default (memory).
+        self::assertSame(5000, (int) $pdo->query('PRAGMA busy_timeout')->fetchColumn());
+        self::assertNotSame('wal', strtolower((string) $pdo->query('PRAGMA journal_mode')->fetchColumn()));
+    }
+
     public function test_it_migrates_a_v1_database_without_losing_rows(): void
     {
         $dbPath = tempnam(sys_get_temp_dir(), 'pulse-v1-');

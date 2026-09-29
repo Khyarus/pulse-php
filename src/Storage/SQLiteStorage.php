@@ -24,6 +24,14 @@ final class SQLiteStorage implements StorageInterface
         $this->pdo = new PDO('sqlite:' . $dbPath);
         $this->pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
         $this->pdo->exec('PRAGMA foreign_keys = ON');
+        $this->pdo->exec('PRAGMA busy_timeout = 5000');
+
+        // WAL improves read/write concurrency, which matters when the collector
+        // writes batches while the dashboard reads. It is not supported by
+        // in-memory databases, so we only enable it for on-disk files.
+        if ($dbPath !== ':memory:') {
+            $this->pdo->exec('PRAGMA journal_mode = WAL');
+        }
 
         $schemaPath = dirname(__DIR__, 2) . '/database/schema.sql';
         $schema = file_get_contents($schemaPath);
