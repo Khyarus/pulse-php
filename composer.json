@@ -1,6 +1,6 @@
 {
     "name": "jgcansi/pulse-php",
-    "description": "Biblioteca leve de observabilidade, monitoramento e telemetria para PHP 8.1+ e Laravel — 100% local, em SQLite.",
+    "description": "Lightweight observability, monitoring and telemetry library for PHP 8.1+ and Laravel — fully local, backed by SQLite.",
     "type": "library",
     "keywords": [
         "observability",
@@ -88,13 +88,13 @@
         ]
     },
     "scripts-descriptions": {
-        "test": "Executa a suíte de testes com PHPUnit.",
-        "test:coverage": "Executa a suíte e gera relatório HTML de cobertura em build/coverage.",
-        "test:smoke": "Executa o teste de fumaça end-to-end (examples/test.php).",
-        "demo:traffic": "Gera tráfego de exemplo para o dashboard (examples/traffic.php).",
-        "check-style": "Verifica o estilo de código sem alterar arquivos (CI).",
-        "format": "Aplica automaticamente as correções de estilo de código.",
-        "validate": "Valida o composer.json em modo estrito.",
-        "check": "Executa validação, verificação de estilo e testes (ideal para CI local)."
+        "test": "Runs the PHPUnit test suite.",
+        "test:coverage": "Runs the suite and generates an HTML coverage report in build/coverage.",
+        "test:smoke": "Runs the end-to-end smoke test (examples/test.php).",
+        "demo:traffic": "Generates sample traffic for the dashboard (examples/traffic.php).",
+        "check-style": "Checks the code style without modifying files (CI).",
+        "format": "Applies code style fixes automatically.",
+        "validate": "Validates composer.json in strict mode.",
+        "check": "Runs validation, style checks and tests (recommended for local CI)."
     }
 }
