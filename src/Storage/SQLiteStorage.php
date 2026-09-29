@@ -16,7 +16,7 @@ final class SQLiteStorage implements StorageInterface
     public function __construct(string $dbPath)
     {
         if ($dbPath !== ':memory:' && !is_dir(dirname($dbPath))) {
-            if (!mkdir(dirname($dbPath), 0775, true) && !is_dir(dirname($dbPath))) {
+            if (!mkdir(dirname($dbPath), 0o775, true) && !is_dir(dirname($dbPath))) {
                 throw new RuntimeException('Unable to create the SQLite database directory.');
             }
         }

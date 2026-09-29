@@ -4,10 +4,10 @@ declare(strict_types=1);
 
 namespace PulsePHP\Storage;
 
-use PDO;
 use DateTimeImmutable;
 use DateTimeZone;
 use InvalidArgumentException;
+use PDO;
 use RuntimeException;
 
 final class QueryEngine
@@ -49,8 +49,7 @@ final class QueryEngine
         string $period = 'all',
         ?string $service = null,
         ?string $route = null
-    ): array
-    {
+    ): array {
         $parameters = [];
         $requestFilter = $this->filterSql('requests', 'requests', $period, $service, $route, $parameters);
         $exceptionFilter = $this->filterSql(
@@ -96,8 +95,7 @@ final class QueryEngine
         string $period = 'all',
         ?string $service = null,
         ?string $route = null
-    ): array
-    {
+    ): array {
         $parameters = [];
         $filters = $this->filterSql('queries', 'queries', $period, $service, $route, $parameters);
         $statement = $this->pdo->prepare(
@@ -136,8 +134,7 @@ final class QueryEngine
         string $period = 'all',
         ?string $service = null,
         ?string $route = null
-    ): array
-    {
+    ): array {
         $parameters = [];
         $filters = $this->filterSql('spans', 'spans', $period, $service, $route, $parameters);
         $statement = $this->pdo->prepare(
@@ -175,8 +172,7 @@ final class QueryEngine
         string $period = 'all',
         ?string $service = null,
         ?string $route = null
-    ): array
-    {
+    ): array {
         $parameters = [];
         $filters = $this->filterSql('exceptions', 'exceptions', $period, $service, $route, $parameters);
         $statement = $this->pdo->prepare(
@@ -207,8 +203,7 @@ final class QueryEngine
         string $period = '1h',
         ?string $service = null,
         ?string $route = null
-    ): array
-    {
+    ): array {
         return array_map(static fn (array $row): array => [
             'minute' => $row['minute'],
             'requests' => $row['count'],
@@ -220,8 +215,7 @@ final class QueryEngine
         string $period = '1h',
         ?string $service = null,
         ?string $route = null
-    ): array
-    {
+    ): array {
         return array_map(static fn (array $row): array => [
             'minute' => $row['minute'],
             'exceptions' => $row['count'],
@@ -234,8 +228,7 @@ final class QueryEngine
         string $period = '1h',
         ?string $service = null,
         ?string $route = null
-    ): array
-    {
+    ): array {
         return $this->getRecentRows('pulse_requests', $limit, $period, $service, $route);
     }
 
@@ -245,8 +238,7 @@ final class QueryEngine
         string $period = '1h',
         ?string $service = null,
         ?string $route = null
-    ): array
-    {
+    ): array {
         return $this->getRecentRows('pulse_outbound_requests', $limit, $period, $service, $route);
     }
 
@@ -435,8 +427,7 @@ final class QueryEngine
         string $period,
         ?string $service,
         ?string $route
-    ): array
-    {
+    ): array {
         $parameters = [':bucket_format' => $this->bucketFormat($period)];
         $filters = $this->filterSql($alias, 'timeline', $period, $service, $route, $parameters);
         $statement = $this->pdo->prepare(

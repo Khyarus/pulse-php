@@ -1,7 +1,9 @@
 <section class="panel min-w-0 p-4 sm:p-5" data-widget="queries" x-show="isVisible('queries')" :style="{ order: widgetOrder('queries') }">
     <div class="mb-4 flex flex-wrap items-start justify-between gap-3">
         <div><h2 class="text-sm font-semibold">Slow query patterns</h2><p class="mt-1 text-xs text-[#718078]">Grouped by normalized SQL</p></div>
-        <?php $widgetId = 'queries'; $widgetLabel = 'Slow queries'; require __DIR__ . '/_controls.php'; ?>
+        <?php $widgetId = 'queries';
+        $widgetLabel = 'Slow queries';
+        require __DIR__ . '/_controls.php'; ?>
     </div>
     <div x-show="!isCollapsed('queries')">
         <div x-show="currentView('queries') === 'chart'" class="h-[260px]"><canvas id="queries-chart" aria-label="Slow query average durations" role="img"></canvas></div>

@@ -95,7 +95,7 @@ final class SQLiteStorageTest extends TestCase
                 . 'ip TEXT, created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP)'
             );
             $legacyPdo->exec(
-                "INSERT INTO pulse_requests (url, method, status_code, duration_ms, memory_bytes, ip) "
+                'INSERT INTO pulse_requests (url, method, status_code, duration_ms, memory_bytes, ip) '
                 . "VALUES ('/legacy', 'GET', 200, 1.5, 128, '127.0.0.1')"
             );
             $legacyPdo->exec(
@@ -105,7 +105,7 @@ final class SQLiteStorageTest extends TestCase
                 . 'created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP)'
             );
             $legacyPdo->exec(
-                "INSERT INTO pulse_exceptions (message, file, line, trace) "
+                'INSERT INTO pulse_exceptions (message, file, line, trace) '
                 . "VALUES ('legacy exception', 'legacy.php', 5, 'trace')"
             );
             unset($legacyPdo);

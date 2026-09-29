@@ -1,7 +1,9 @@
 <section class="panel min-w-0 p-4 sm:p-5" data-widget="spans" x-show="isVisible('spans')" :style="{ order: widgetOrder('spans') }">
     <div class="mb-4 flex flex-wrap items-start justify-between gap-3">
         <div><h2 class="text-sm font-semibold">Slow spans</h2><p class="mt-1 text-xs text-[#718078]">Grouped by span, service and route</p></div>
-        <?php $widgetId = 'spans'; $widgetLabel = 'Spans'; require __DIR__ . '/_controls.php'; ?>
+        <?php $widgetId = 'spans';
+        $widgetLabel = 'Spans';
+        require __DIR__ . '/_controls.php'; ?>
     </div>
     <div x-show="!isCollapsed('spans')">
         <div x-show="currentView('spans') === 'chart'" class="h-[260px]"><canvas id="spans-chart" aria-label="Span average durations" role="img"></canvas></div>

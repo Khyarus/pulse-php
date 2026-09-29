@@ -277,7 +277,7 @@ final class Dashboard
     }
 
     /** @param array{avg_duration_ms: float, error_rate_percent: float, unhandled_exceptions: int} $metric
-     *  @return array{key: string, label: string, color: string}
+     * @return array{key: string, label: string, color: string}
      */
     private function routeHealth(array $metric): array
     {

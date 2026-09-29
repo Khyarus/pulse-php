@@ -1,7 +1,9 @@
 <section class="panel min-w-0 p-4 sm:p-5" data-widget="outbound" x-show="isVisible('outbound')" :style="{ order: widgetOrder('outbound') }">
     <div class="mb-4 flex flex-wrap items-start justify-between gap-3">
         <div><h2 class="text-sm font-semibold">Outbound API calls</h2><p class="mt-1 text-xs text-[#718078]">Laravel HTTP client requests and failures</p></div>
-        <?php $widgetId = 'outbound'; $widgetLabel = 'Outbound APIs'; require __DIR__ . '/_controls.php'; ?>
+        <?php $widgetId = 'outbound';
+        $widgetLabel = 'Outbound APIs';
+        require __DIR__ . '/_controls.php'; ?>
     </div>
     <div x-show="!isCollapsed('outbound')">
         <div x-show="currentView('outbound') === 'chart'" class="h-[260px]"><canvas id="outbound-chart" aria-label="Outbound API response durations" role="img"></canvas></div>

@@ -4,17 +4,17 @@ declare(strict_types=1);
 
 namespace PulsePHP\Laravel;
 
+use Illuminate\Database\Events\QueryExecuted;
 use Illuminate\Http\Client\Events\ConnectionFailed;
 use Illuminate\Http\Client\Events\RequestSending;
 use Illuminate\Http\Client\Events\ResponseReceived;
-use Illuminate\Database\Events\QueryExecuted;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\ServiceProvider;
+use PulsePHP\Laravel\Collectors\OutboundHttpCollector;
 use PulsePHP\Laravel\Http\Controllers\DashboardController;
 use PulsePHP\Laravel\Http\Middleware\PulseMiddleware;
-use PulsePHP\Laravel\Collectors\OutboundHttpCollector;
 use PulsePHP\Pulse;
 
 final class PulseServiceProvider extends ServiceProvider

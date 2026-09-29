@@ -38,8 +38,7 @@ final class Pulse
         private StorageInterface $storage,
         bool $registerStandaloneCollectors,
         string $serviceName
-    )
-    {
+    ) {
         $this->setContext(
             $serviceName,
             $this->routeFromRequest(),
@@ -60,8 +59,7 @@ final class Pulse
         string $dbPath,
         bool $registerStandaloneCollectors = true,
         ?string $serviceName = null
-    ): self
-    {
+    ): self {
         if (self::$instance !== null) {
             return self::$instance;
         }

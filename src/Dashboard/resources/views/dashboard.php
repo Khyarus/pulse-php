@@ -213,11 +213,21 @@ $escape = static fn (mixed $value): string => htmlspecialchars(
         </section>
 
         <div class="mt-4 grid grid-cols-1 gap-4 xl:grid-cols-2">
-            <?php $widgetId = 'requests'; $widgetLabel = 'Requests'; require __DIR__ . '/widgets/requests.php'; ?>
-            <?php $widgetId = 'queries'; $widgetLabel = 'Slow queries'; require __DIR__ . '/widgets/queries.php'; ?>
-            <?php $widgetId = 'spans'; $widgetLabel = 'Spans'; require __DIR__ . '/widgets/spans.php'; ?>
-            <?php $widgetId = 'outbound'; $widgetLabel = 'Outbound APIs'; require __DIR__ . '/widgets/outbound.php'; ?>
-            <?php $widgetId = 'exceptions'; $widgetLabel = 'Exceptions'; require __DIR__ . '/widgets/exceptions.php'; ?>
+            <?php $widgetId = 'requests';
+$widgetLabel = 'Requests';
+require __DIR__ . '/widgets/requests.php'; ?>
+            <?php $widgetId = 'queries';
+$widgetLabel = 'Slow queries';
+require __DIR__ . '/widgets/queries.php'; ?>
+            <?php $widgetId = 'spans';
+$widgetLabel = 'Spans';
+require __DIR__ . '/widgets/spans.php'; ?>
+            <?php $widgetId = 'outbound';
+$widgetLabel = 'Outbound APIs';
+require __DIR__ . '/widgets/outbound.php'; ?>
+            <?php $widgetId = 'exceptions';
+$widgetLabel = 'Exceptions';
+require __DIR__ . '/widgets/exceptions.php'; ?>
         </div>
 
         <footer class="pb-4 pt-5 text-center text-[11px] text-[#89968f]">PulsePHP · local telemetry</footer>

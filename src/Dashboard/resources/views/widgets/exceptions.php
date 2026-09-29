@@ -1,7 +1,9 @@
 <section class="panel min-w-0 p-4 sm:p-5 xl:col-span-2" data-widget="exceptions" x-show="isVisible('exceptions')" :style="{ order: widgetOrder('exceptions') }">
     <div class="mb-4 flex flex-wrap items-start justify-between gap-3">
         <div><h2 class="text-sm font-semibold">Recent exceptions</h2><p class="mt-1 text-xs text-[#718078]">Latest captured errors in the selected scope</p></div>
-        <?php $widgetId = 'exceptions'; $widgetLabel = 'Exceptions'; require __DIR__ . '/_controls.php'; ?>
+        <?php $widgetId = 'exceptions';
+        $widgetLabel = 'Exceptions';
+        require __DIR__ . '/_controls.php'; ?>
     </div>
     <div x-show="!isCollapsed('exceptions')">
         <div x-show="currentView('exceptions') === 'chart'" class="h-[260px]"><canvas id="exceptions-chart" aria-label="Exceptions over selected period" role="img"></canvas></div>

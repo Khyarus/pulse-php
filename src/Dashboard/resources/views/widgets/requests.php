@@ -4,7 +4,9 @@
             <h2 class="text-sm font-semibold">Request activity</h2>
             <p class="mt-1 text-xs text-[#718078]">Inbound requests grouped by time</p>
         </div>
-        <?php $widgetId = 'requests'; $widgetLabel = 'Requests'; require __DIR__ . '/_controls.php'; ?>
+        <?php $widgetId = 'requests';
+        $widgetLabel = 'Requests';
+        require __DIR__ . '/_controls.php'; ?>
     </div>
     <div x-show="!isCollapsed('requests')">
         <div x-show="currentView('requests') === 'chart'" class="h-[260px]">
