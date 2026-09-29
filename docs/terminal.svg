@@ -1,0 +1,35 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="900" height="340" viewBox="0 0 900 340" role="img" aria-label="Instalação e execução do PulsePHP no terminal">
+  <defs>
+    <style>
+      .mono { font-family: 'Cascadia Code', Consolas, 'Courier New', monospace; }
+    </style>
+  </defs>
+
+  <rect width="900" height="340" rx="12" fill="#0d1512" stroke="#2a3631" stroke-width="1.5"/>
+  <path d="M0 36 H900" stroke="#2a3631" stroke-width="1.5"/>
+  <rect x="0" y="0" width="900" height="36" rx="12" fill="#111a16"/>
+  <rect x="0" y="24" width="900" height="12" fill="#111a16"/>
+
+  <circle cx="22" cy="18" r="6" fill="#f16d76"/>
+  <circle cx="42" cy="18" r="6" fill="#e7b957"/>
+  <circle cx="62" cy="18" r="6" fill="#42c98a"/>
+  <text x="450" y="23" class="mono" font-size="12" fill="#718078" text-anchor="middle">~/meu-projeto — bash</text>
+
+  <g class="mono" font-size="15">
+    <text x="28" y="72" fill="#42c98a">➜</text>
+    <text x="48" y="72" fill="#e8f0eb">composer require jgcansi/pulse-php</text>
+
+    <text x="28" y="104" fill="#52645a">Using version ^1.0 for jgcansi/pulse-php</text>
+    <text x="28" y="126" fill="#52645a">  - Installing jgcansi/pulse-php (1.0.0)</text>
+    <text x="28" y="148" fill="#42c98a">Package installed successfully.</text>
+
+    <text x="28" y="192" fill="#42c98a">➜</text>
+    <text x="48" y="192" fill="#e8f0eb">php -S 127.0.0.1:8000 -t public</text>
+    <text x="28" y="220" fill="#52645a">[Wed] PHP 8.3 development server started</text>
+    <text x="28" y="242" fill="#52645a">Listening on http://127.0.0.1:8000</text>
+
+    <text x="28" y="286" fill="#42c98a">➜</text>
+    <text x="48" y="286" fill="#e8f0eb">php traffic.php --iterations=8</text>
+    <text x="28" y="314" fill="#8ff0bf">[12:11:56] POST /api/v1/payments - 602ms (200 OK) [gateway-pagamento]</text>
+  </g>
+</svg>

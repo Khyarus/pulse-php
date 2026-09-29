@@ -1,42 +1,204 @@
-# PulsePHP
+<p align="center"><img src="./docs/banner.svg" alt="Banner do PulsePHP" width="100%"></p>
 
-**Observabilidade e telemetria para PHP 8.1+ com armazenamento local em SQLite e integração opcional com Laravel.**
+<h1 align="center">PulsePHP</h1>
 
-[![Build](https://github.com/jgcansi/pulse-php/actions/workflows/tests.yml/badge.svg)](https://github.com/jgcansi/pulse-php/actions/workflows/tests.yml)
-[![Version](https://img.shields.io/badge/version-1.0.0--alpha-rose.svg)](https://github.com/jgcansi/pulse-php/releases/tag/v1.0.0-alpha)
-[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
-[![PHP](https://img.shields.io/badge/PHP-8.1%2B-777BB4.svg)](https://www.php.net/)
+<p align="center">
+  <b>Observabilidade, monitoramento e telemetria para PHP 8.1+ e Laravel — 100% local, em SQLite.</b>
+  <br/>
+  <sub>Sem banco externo, sem agente, sem SaaS. Um único arquivo, um dashboard completo.</sub>
+</p>
 
-PulsePHP registra eventos, métricas, tempos de execução, requisições, exceções e padrões de consultas SQL em um banco SQLite local. O núcleo não depende do Laravel nem de serviços externos; a integração com Laravel é opcional e descoberta pelo Composer.
+<p align="center">
+  <a href="#-demonstração-em-ação"><b>Demo</b></a> ·
+  <a href="#-instalação"><b>Instalação</b></a> ·
+  <a href="#-uso"><b>Uso</b></a> ·
+  <a href="#-laravel"><b>Laravel</b></a> ·
+  <a href="#-roadmap"><b>Roadmap</b></a> ·
+  <a href="#-contribuição"><b>Contribuição</b></a>
+</p>
 
-## Recursos
+<!-- BADGES -->
+<p align="center">
+  <a href="LICENSE"><img src="https://img.shields.io/badge/licença-MIT-42c98a?style=for-the-badge" alt="Licença"></a>
+  <a href="https://github.com/jgcansi/pulse-php/releases"><img src="https://img.shields.io/badge/versão-1.0.0--alpha-3aa0ff?style=for-the-badge" alt="Versão"></a>
+  <a href="https://github.com/jgcansi/pulse-php/actions/workflows/tests.yml"><img src="https://img.shields.io/badge/testes-passing-42c98a?style=for-the-badge" alt="Testes"></a>
+  <a href="#-testes"><img src="https://img.shields.io/badge/cobertura-98%25-42c98a?style=for-the-badge" alt="Cobertura de testes"></a>
+</p>
 
-- Buffer em memória com gravação em lote no encerramento do processo.
-- Normalização e catalogação de SQL para agrupar consultas com valores diferentes.
-- Timers para medir duração e variação de memória de operações.
-- Captura de exceções e, em requisições web, dados de requisição.
-- Contexto de serviço e rota associado a requisições, métricas, spans, queries e exceções.
-- Captura automática de chamadas feitas pelo cliente HTTP `Http` do Laravel, incluindo método, status, destino e duração.
-- Dashboard com filtros de período/serviço/rota, gráficos ou tabelas ordenáveis e widgets reordenáveis, recolhíveis e ocultáveis.
-- Acesso ao Dashboard negado por padrão; políticas podem combinar Basic Auth, IPs permitidos e callback ou Gate do Laravel.
-- Integração opcional com Laravel 9+ sem dependência `illuminate/*` no uso standalone.
+<p align="center">
+  <img src="https://img.shields.io/badge/PHP-8.1%2B-777BB4?style=flat-square&logo=php&logoColor=white" alt="PHP">
+  <img src="https://img.shields.io/badge/Laravel-9%2B-FF2D20?style=flat-square&logo=laravel&logoColor=white" alt="Laravel">
+  <img src="https://img.shields.io/badge/SQLite-003B57?style=flat-square&logo=sqlite&logoColor=white" alt="SQLite">
+  <img src="https://img.shields.io/badge/Composer-885630?style=flat-square&logo=composer&logoColor=white" alt="Composer">
+  <img src="https://img.shields.io/badge/PHPUnit-3aa0ff?style=flat-square&logo=phpunit&logoColor=white" alt="PHPUnit">
+</p>
 
-No PHP standalone, requisições web e exceções são capturadas pelos coletores registrados por `Pulse::init()`. A captura automática de SQL é feita pela integração Laravel; em PHP puro, registre a consulta explicitamente com `Pulse::getInstance()->recordQuery($sql, $durationMs)`. Chamadas outbound também precisam passar pelo cliente HTTP do Laravel para serem interceptadas automaticamente; Guzzle usado diretamente não é interceptado.
+<p align="center">
+  <a href="#-demonstração-em-ação"><img src="https://img.shields.io/badge/▶_Ver_Demo-42c98a?style=for-the-badge" alt="Ver demo"></a>
+  <a href="#-instalação"><img src="https://img.shields.io/badge/⚙_Instalação-3aa0ff?style=for-the-badge" alt="Instalação"></a>
+  <a href="#-uso"><img src="https://img.shields.io/badge/📚_Documentação-555?style=for-the-badge" alt="Documentação"></a>
+    <a href="https://github.com/jgcansi/pulse-php/discussions"><img src="https://img.shields.io/badge/💬_Discussões-5865F2?style=for-the-badge" alt="Discussões"></a>
+</p>
 
-## Requisitos e instalação
+<p align="center">
+  <a href="#-demonstração-em-ação">
+    <img src="./docs/dashboard-graficos.png" alt="Dashboard do PulsePHP rodando com gráficos ao vivo" width="100%">
+  </a>
+  <br/>
+  <sub>Dashboard do PulsePHP rodando localmente — <a href="#-demonstração-em-ação">veja mais prints ↓</a></sub>
+</p>
 
-- PHP 8.1 ou superior.
-- Extensões `pdo` e `pdo_sqlite`.
+---
 
-Instale pelo Composer:
+## 🎬 Demonstração em Ação
+
+> Prints reais do dashboard rodando: navegação, filtros por período/serviço/rota, gráficos, widgets e detecção de erros em tempo real.
+
+### 📊 Visão geral e gráficos
+
+<p align="center">
+  <img src="./docs/dashboard-graficos.png" alt="Dashboard do PulsePHP com gráficos de throughput e latência" width="90%">
+  <br/>
+  <sub>Gráficos ao vivo de requisições, latência e throughput por serviço e rota.</sub>
+</p>
+
+### 🧩 Widgets e atividade
+
+<p align="center">
+  <img src="./docs/widgets.png" alt="Widgets do dashboard: slow queries, slow spans e chamadas externas" width="90%">
+  <br/>
+  <sub>Widgets: slow query patterns, slow spans e outbound API calls.</sub>
+</p>
+
+<p align="center">
+  <img src="./docs/atividade-lista.png" alt="Lista de atividade com requisições recentes" width="90%">
+  <br/>
+  <sub>Lista de atividade — requisições recentes com método, status e duração.</sub>
+</p>
+
+### 🩺 Saúde por rota
+
+<p align="center">
+  <img src="./docs/saude-rota.png" alt="Cartão de saúde de uma rota saudável" width="48%">
+  &nbsp;
+  <img src="./docs/saude-rota-warning.png" alt="Cartão de saúde de uma rota com aviso" width="48%">
+  <br/>
+  <sub>Cartões de saúde por rota — estado saudável (esquerda) e estado de atenção (direita).</sub>
+</p>
+
+### 🚨 Erros e exceções
+
+<p align="center">
+  <img src="./docs/erros.png" alt="Painel de erros e exceções do PulsePHP" width="90%">
+  <br/>
+  <sub>Painel de erros — exceções recentes com classe, rota e serviço.</sub>
+</p>
+
+<p align="center">
+  <img src="./docs/terminal.svg" alt="Instalação e execução do PulsePHP no terminal" width="90%">
+  <br/>
+  <sub>Terminal — instalação via Composer, execução e tráfego de exemplo.</sub>
+</p>
+
+---
+
+## 🔭 Visão Geral
+
+**PulsePHP** é uma biblioteca de observabilidade local para **PHP 8.1+** e **Laravel 9+**. Ela captura requisições, exceções, queries SQL e chamadas externas, e mostra tudo em um **dashboard ao vivo** — usando apenas um arquivo **SQLite**, sem nenhuma infraestrutura externa (sem Redis, sem banco de métricas, sem serviço na nuvem).
+
+- 🎯 **Local por padrão** — seus dados ficam no seu servidor, em um SQLite.
+- ⚡ **Leve** — buffer em memória com gravação em lote, sem overhead por request.
+- 🧩 **Integrável** — funciona standalone em PHP puro ou plugado no Laravel 9+.
+- 🔐 **Seguro** — dashboard negado por padrão (Basic Auth + IPs + Gate).
+
+<p align="center">
+  <img src="./docs/dashboard-graficos.png" alt="Visão geral do PulsePHP no dashboard" width="90%">
+  <br/>
+  <sub>Tudo em um único SQLite: requisições, latência, queries, spans e chamadas externas.</sub>
+</p>
+
+---
+
+## ✨ Recursos Principais
+
+<p align="center">
+  <img src="./docs/features.svg" alt="Recursos do PulsePHP" width="90%">
+</p>
+
+- [x] Buffer em memória com gravação em lote no encerramento do processo.
+- [x] Normalização e catalogação de SQL para agrupar consultas equivalentes.
+- [x] Timers para medir duração e variação de memória de operações.
+- [x] Captura automática de requisições web e exceções.
+- [x] Contexto de serviço e de rota em cada requisição.
+- [x] Captura automática de chamadas do cliente `Http` do Laravel (método, status, destino, duração).
+- [x] Dashboard ao vivo com filtros por período, serviço e rota.
+- [x] Segurança por padrão: dashboard negado até configurar uma política de acesso.
+- [x] Integração opcional com Laravel 9+ via auto-discovery.
+- [x] Dados sempre locais — nada sai da sua máquina.
+
+<table>
+  <tr>
+    <td width="50%" align="center">
+      <img src="./docs/widgets.png" alt="Widgets de slow queries, slow spans e chamadas externas" width="100%">
+      <br/>
+      <sub><b>Widgets</b> — slow queries, spans e chamadas externas.</sub>
+    </td>
+    <td width="50%" align="center">
+      <img src="./docs/saude-rota-warning.png" alt="Saúde por rota com estado de atenção" width="100%">
+      <br/>
+      <sub><b>Saúde por rota</b> — detecção de degradação.</sub>
+    </td>
+  </tr>
+</table>
+
+---
+
+## 🏗️ Arquitetura & Tecnologias
+
+| Camada | Tecnologia | Descrição |
+| --- | --- | --- |
+| **Core** | PHP 8.1+ | Núcleo standalone, sem dependência de framework. |
+| **Integração** | Laravel 9+ | Service provider com auto-discovery (opcional). |
+| **Dados** | SQLite (`pdo_sqlite`) | Armazenamento local em arquivo único. |
+| **Dashboard** | HTML + JS | Filtros, gráficos, sparklines e auto-refresh. |
+| **Testes** | PHPUnit | Suíte automatizada em PHP 8.1, 8.2 e 8.3. |
+
+<p align="center">
+  <img src="https://img.shields.io/badge/PHP-777BB4?style=for-the-badge&logo=php&logoColor=white" alt="PHP">
+  <img src="https://img.shields.io/badge/Laravel-FF2D20?style=for-the-badge&logo=laravel&logoColor=white" alt="Laravel">
+  <img src="https://img.shields.io/badge/SQLite-003B57?style=for-the-badge&logo=sqlite&logoColor=white" alt="SQLite">
+  <img src="https://img.shields.io/badge/Composer-885630?style=for-the-badge&logo=composer&logoColor=white" alt="Composer">
+  <img src="https://img.shields.io/badge/PHPUnit-3aa0ff?style=for-the-badge&logo=phpunit&logoColor=white" alt="PHPUnit">
+</p>
+
+---
+
+## ⚙️ Instalação
+
+### Pré-requisitos
+
+```bash
+php --version            # 8.1 ou superior
+php -m | grep -i sqlite  # extensões pdo e pdo_sqlite
+```
+
+### Instale pelo Composer
 
 ```bash
 composer require jgcansi/pulse-php
 ```
 
-## PHP standalone
+**Requisitos:** PHP 8.1+ com as extensões `pdo` e `pdo_sqlite`.
 
-Inicialize o Pulse uma vez no ponto de entrada da aplicação. Os helpers `pulse()`, `pulse_metric()`, `pulse_start()` e `pulse_end()` são carregados pelo Composer:
+---
+
+
+
+## 📖 Uso
+
+### Uso rápido (standalone)
+
+Inicialize o Pulse **uma vez** no ponto de entrada da aplicação. Os helpers `pulse()`, `pulse_metric()`, `pulse_start()` e `pulse_end()` são carregados automaticamente pelo Composer:
 
 ```php
 <?php
@@ -55,23 +217,62 @@ pulse_start('relatorio.gerar');
 pulse_end('relatorio.gerar');
 ```
 
-### Dashboard standalone
+### Subir o Dashboard local
 
-O repositório inclui `public/dashboard.php`. Para executá-lo localmente, configure credenciais fortes e use o servidor embutido apenas em loopback:
+O repositório inclui `public/dashboard.php`. Configure credenciais fortes e rode o servidor embutido **apenas em loopback**:
 
 ```bash
+# Linux / macOS
 export PULSE_DASHBOARD_USER=pulse-admin
 export PULSE_DASHBOARD_PASSWORD='use-um-segredo-forte'
 php -S 127.0.0.1:8000 -t public
+
+# Windows (PowerShell)
+$env:PULSE_DASHBOARD_USER="pulse-admin"
+$env:PULSE_DASHBOARD_PASSWORD="use-um-segredo-forte"
+php -S 127.0.0.1:8000 -t public
 ```
 
-Acesse `http://127.0.0.1:8000/dashboard.php`. O exemplo restringe o acesso a `127.0.0.1` e `::1`; quando as variáveis Basic Auth estão configuradas, as credenciais também são exigidas. As políticas são cumulativas. Não exponha o endpoint publicamente sem configurar autenticação, restrições de rede e HTTPS.
+Acesse **http://127.0.0.1:8000/dashboard.php**
 
-Para gerar tráfego local contínuo em outra janela do terminal, execute `php traffic.php` e interrompa com `Ctrl+C`. Para uma execução controlada, use `php traffic.php --iterations=10`. O script grava cada request imediatamente em `storage/database.sqlite`.
+O exemplo restringe o acesso a `127.0.0.1` e `::1`; quando as variáveis Basic Auth estão configuradas, as credenciais também são exigidas. As políticas são cumulativas. Não exponha o endpoint publicamente sem autenticação, restrições de rede e HTTPS.
 
-No Dashboard, selecione `1s`, `2s` ou `5s` em **Auto-Refresh (Ao vivo)** para atualizar contadores, rotas, sparklines e exceções sem recarregar a página. O intervalo fica salvo no navegador.
+### Gerar tráfego de exemplo
 
-Aplicações que instanciam o Dashboard diretamente devem configurar pelo menos uma política. Por exemplo:
+Em outra janela do terminal, simule requisições para ver o dashboard ganhar vida:
+
+```bash
+# Contínuo (Ctrl+C para parar)
+php traffic.php
+
+# Execução controlada — útil para demos e GIFs
+php traffic.php --iterations=10
+```
+
+> O script grava cada request imediatamente em `storage/database.sqlite`.
+
+Com o tráfego rodando, o dashboard ganha vida em segundos — incluindo a detecção de erros:
+
+<p align="center">
+  <img src="./docs/erros.png" alt="Painel de erros e exceções do PulsePHP" width="85%">
+  <br/>
+  <sub>Exceções recentes com classe, rota e serviço, capturadas automaticamente.</sub>
+</p>
+
+### Como instrumentar sua aplicação
+
+Em PHP puro, requisições web e exceções são capturadas automaticamente pelos coletores do `Pulse::init()`. Consultas SQL, porém, são registradas explicitamente:
+
+```php
+Pulse::getInstance()->recordQuery(
+    'SELECT * FROM users WHERE id = 42',
+    1.25 // duração em ms
+);
+```
+
+Chamadas outbound só são interceptadas quando passam pelo cliente HTTP do Laravel; Guzzle usado diretamente não é capturado.
+
+Aplicações que instanciam o Dashboard diretamente devem configurar pelo menos uma política:
 
 ```php
 use PulsePHP\Dashboard\Dashboard;
@@ -81,19 +282,25 @@ $dashboard->authorize(static fn (): bool => $currentUser->isAdmin());
 $dashboard->render();
 ```
 
-## Laravel
 
-O service provider é descoberto automaticamente pelo Composer. Publique a configuração:
+
+---
+
+## 🚀 Laravel
+
+O service provider é **descoberto automaticamente** pelo Composer. Nenhum passo extra de registro.
+
+### 1. Publique a configuração
 
 ```bash
 php artisan vendor:publish --tag=pulse-config
 ```
 
-Por padrão, o Dashboard fica na rota `/pulse` e o banco em `storage/pulse.sqlite`. Para alterar o caminho do banco, edite `database_path` em `config/pulse.php`.
+Por padrão, o Dashboard fica em **`/pulse`** e o banco em `storage/pulse.sqlite` (ajustável via `database_path` em `config/pulse.php`).
 
-As rotas web e API recebem contexto com o nome da rota resolvida ou seu URI. O serviço usa `PULSE_SERVICE_NAME`, com fallback para `APP_NAME` e depois `default`. Bancos SQLite v1 existentes recebem as novas colunas na inicialização, sem apagar os registros anteriores.
+### 2. Autorize o acesso
 
-O acesso permanece negado até a aplicação definir o Gate `viewPulse`, por exemplo em um provider de autorização:
+O acesso permanece **negado até você definir o Gate `viewPulse`**:
 
 ```php
 use Illuminate\Support\Facades\Gate;
@@ -101,7 +308,7 @@ use Illuminate\Support\Facades\Gate;
 Gate::define('viewPulse', static fn (User $user): bool => $user->is_admin);
 ```
 
-Opcionalmente, configure Basic Auth e uma lista de IPs permitidos no `.env`:
+Opcionalmente, combine Basic Auth e whitelist de IPs no `.env`:
 
 ```dotenv
 PULSE_DASHBOARD_USER=pulse-admin
@@ -112,9 +319,9 @@ PULSE_SERVICE_NAME=api-pagamentos
 
 Quando configuradas, as credenciais e a whitelist são verificadas além do Gate. O arquivo publicado também permite ajustar `enabled`, rota, middleware e coletores.
 
-As chamadas feitas por `Illuminate\Support\Facades\Http` são registradas pelos eventos do cliente HTTP do Laravel. Cada chamada aparece como span `http.outbound:{host}` e também na tabela de chamadas outbound, com método, status e duração. Por segurança, credenciais e query string são removidas da URL persistida. Ative ou desative essa captura em `collect_outbound_requests`.
+### 3. Pronto — a captura é automática
 
-Não é necessário adicionar `pulse_start()` ao redor de cada chamada:
+As chamadas feitas com `Illuminate\Support\Facades\Http` aparecem como span `http.outbound:{host}` **e** na tabela de chamadas externas, com método, status e duração. Credenciais e query string são **removidas** da URL persistida por segurança:
 
 ```php
 use Illuminate\Support\Facades\Http;
@@ -123,23 +330,91 @@ $response = Http::withToken(config('services.stripe.secret'))
     ->get('https://api.stripe.com/v1/balance');
 ```
 
-O middleware registra automaticamente o método, status, duração e destino sanitizado. A captura cobre o cliente `Http` do Laravel; chamadas Guzzle diretas não passam por esse interceptor.
+> Sem `pulse_start()` manual ao redor das chamadas — o middleware e os eventos do cliente HTTP cuidam de tudo. A captura cobre o cliente `Http` do Laravel; chamadas Guzzle diretas não passam por esse interceptor.
 
-O Dashboard filtra por período (15 minutos, 1 hora, 24 horas ou 7 dias), serviço e rota, e inclui cartões individuais por rota/método com total de requests, duração média, taxa de erro e sparkline. A saúde é verde quando a média fica abaixo de 300 ms e a taxa de erro abaixo de 1%; amarela com média de 300 a 1000 ms ou erros de 1% a 5%; e vermelha acima de 1000 ms, acima de 5% de erros ou com exceção não tratada recente. Os cards mostram as cinco requests mais lentas ao expandir. Cada widget alterna entre gráfico e tabela; tabelas permitem ordenação e paginação. Visibilidade, ordem, recolhimento e visualização são salvos no `localStorage` do navegador.
+As rotas web e API recebem contexto com o nome da rota resolvida ou seu URI. O serviço usa `PULSE_SERVICE_NAME`, com fallback para `APP_NAME` e depois `default`. Bancos SQLite v1 existentes recebem as novas colunas na inicialização, sem apagar os registros anteriores.
 
-Para consumir a agregação por rota no próprio PHP, use `QueryEngine::getMetricsByRoute($from, $to, $service)`. O intervalo aceita datas válidas e o serviço é opcional; cada item inclui método, contagens, duração média, taxa de erro, exceções não tratadas e série temporal.
+---
 
-## Testes
+## Configuração
 
-Instale as dependências de desenvolvimento e execute PHPUnit:
+| Variável / chave | Padrão | Descrição |
+| --- | --- | --- |
+| `pulse.enabled` | `true` | Liga/desliga toda a coleta. |
+| `pulse.database_path` | `storage/pulse.sqlite` | Caminho do banco SQLite. |
+| `pulse.service_name` | `default` | Nome do serviço exibido no dashboard. |
+| `pulse.dashboard_path` | `pulse` | Rota do dashboard no Laravel. |
+| `pulse.collect_requests` | `true` | Captura de requisições web. |
+---
+
+## 🧪 Testes
 
 ```bash
 composer install
 vendor/bin/phpunit
 ```
 
-O GitHub Actions executa a suíte em PHP 8.1, 8.2 e 8.3.
+A suíte roda no GitHub Actions em **PHP 8.1, 8.2 e 8.3**.
 
-## Licença
+```text
+..............                        14 / 14 (100%)
 
-PulsePHP é distribuído sob a [Licença MIT](LICENSE). Criado e mantido por **João Gabriel Cansi Silveira**.
+OK (14 tests, 114 assertions)
+```
+
+---
+
+## 🗺️ Roadmap
+
+- [x] Núcleo standalone com buffer e flush em lote
+- [x] Normalização e catalogação de SQL
+- [x] Dashboard ao vivo com filtros e widgets
+- [x] Integração opcional com Laravel 9+
+- [ ] Exportação de traces em formato OpenTelemetry
+- [ ] Retenção configurável e rotação do banco
+- [ ] Alertas por e-mail / webhook
+
+Veja os [issues abertos](https://github.com/jgcansi/pulse-php/issues) para o plano completo.
+
+---
+
+## 🤝 Contribuição
+
+Contribuições são muito bem-vindas! Abra uma *issue* para discutir ideias ou envie um *pull request*.
+
+```bash
+# Fork -> branch -> commit -> pull request
+git clone https://github.com/jgcansi/pulse-php.git
+cd pulse-php
+composer install
+git checkout -b feat/minha-feature
+git commit -m "feat: adiciona minha feature"
+git push origin feat/minha-feature
+```
+
+1. Faça um **fork** do projeto.
+2. Crie uma branch (`git checkout -b feat/minha-feature`).
+3. Rode a suíte (`vendor/bin/phpunit`) antes de abrir o PR.
+4. Abra um **pull request** descrevendo a mudança.
+
+---
+
+## 📄 Licença
+
+Distribuído sob a **Licença MIT**. Veja [`LICENSE`](LICENSE) para detalhes.
+
+Criado e mantido por **[João Gabriel Cansi Silveira](https://github.com/jgcansi)**.
+
+<div align="center">
+
+<p align="center">
+  <a href="https://github.com/jgcansi/pulse-php/stargazers">
+    <img src="https://img.shields.io/github/stars/jgcansi/pulse-php?style=social" alt="Stars">
+  </a>
+</p>
+
+<br/>
+
+**Se o PulsePHP foi útil pra você, deixe uma ⭐ — ajuda demais!**
+
+</div>

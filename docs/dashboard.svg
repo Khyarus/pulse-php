@@ -1,0 +1,149 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="900" height="520" viewBox="0 0 900 520" role="img" aria-label="Dashboard do PulsePHP">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#0d1512"/>
+      <stop offset="1" stop-color="#0b100e"/>
+    </linearGradient>
+    <linearGradient id="spark" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#42c98a"/>
+      <stop offset="1" stop-color="#8ff0bf"/>
+    </linearGradient>
+    <style>
+      .mono { font-family: 'Cascadia Code', Consolas, 'Courier New', monospace; }
+      .ui   { font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; }
+    </style>
+  </defs>
+
+  <!-- window frame -->
+  <rect width="900" height="520" rx="12" fill="url(#bg)" stroke="#2a3631" stroke-width="1.5"/>
+  <path d="M0 36 H900" stroke="#2a3631" stroke-width="1.5"/>
+  <rect x="0" y="0" width="900" height="36" rx="12" fill="#111a16"/>
+  <rect x="0" y="24" width="900" height="12" fill="#111a16"/>
+
+  <circle cx="22" cy="18" r="6" fill="#f16d76"/>
+  <circle cx="42" cy="18" r="6" fill="#e7b957"/>
+  <circle cx="62" cy="18" r="6" fill="#42c98a"/>
+  <text x="450" y="23" class="mono" font-size="12" fill="#718078" text-anchor="middle">Pulse — Dashboard · api-pagamentos · últimas 24h</text>
+
+  <!-- logo mark + tabs -->
+  <g transform="translate(24 56)">
+    <rect width="26" height="26" rx="7" fill="#143b2c" stroke="#2a5a44"/>
+    <path d="M6 13 H10 L12 7 L16 19 L19 11 L21 15 H22" fill="none" stroke="url(#spark)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+  </g>
+  <text x="60" y="74" class="ui" font-size="15" font-weight="700" fill="#e8f0eb">Pulse<tspan fill="#42c98a">PHP</tspan></text>
+
+  <g class="mono" font-size="12">
+    <text x="180" y="74" fill="#8ff0bf">Visão geral</text>
+    <text x="280" y="74" fill="#718078">Requisições</text>
+    <text x="392" y="74" fill="#718078">Queries</text>
+    <text x="464" y="74" fill="#718078">Exceções</text>
+    <text x="552" y="74" fill="#718078">Chamadas externas</text>
+  </g>
+  <path d="M180 82 H258" stroke="#42c98a" stroke-width="2"/>
+  <g transform="translate(820 62)">
+    <rect width="56" height="24" rx="12" fill="#122019" stroke="#2a5a44"/>
+    <circle cx="14" cy="12" r="4" fill="#42c98a"/>
+    <text x="26" y="16" class="mono" font-size="11" fill="#8ff0bf">auto</text>
+  </g>
+
+  <!-- filter bar -->
+  <rect x="24" y="100" width="852" height="40" rx="8" fill="#0f1a15" stroke="#222f29"/>
+  <g class="mono" font-size="12">
+    <text x="40" y="125" fill="#718078">período:</text>
+    <rect x="100" y="110" width="72" height="20" rx="6" fill="#122019" stroke="#2a5a44"/>
+    <text x="112" y="124" fill="#8ff0bf">24 horas</text>
+    <text x="192" y="125" fill="#718078">serviço:</text>
+    <rect x="244" y="110" width="150" height="20" rx="6" fill="#122019" stroke="#2a5a44"/>
+    <text x="256" y="124" fill="#8ff0bf">api-pagamentos</text>
+    <text x="412" y="125" fill="#718078">rota:</text>
+    <rect x="446" y="110" width="190" height="20" rx="6" fill="#122019" stroke="#2a5a44"/>
+    <text x="458" y="124" fill="#8ff0bf">POST /api/v1/payments</text>
+    <text x="672" y="125" fill="#718078">status:</text>
+    <rect x="716" y="110" width="90" height="20" rx="6" fill="#122019" stroke="#2a5a44"/>
+    <text x="728" y="124" fill="#8ff0bf">somente 5xx</text>
+  </g>
+
+  <!-- metric cards -->
+  <g class="ui">
+    <!-- card 1 -->
+    <rect x="24" y="156" width="204" height="96" rx="10" fill="#0f1a15" stroke="#222f29"/>
+    <text x="40" y="182" font-size="12" fill="#718078">Requisições</text>
+    <text x="40" y="216" class="mono" font-size="30" font-weight="700" fill="#e8f0eb">1.284</text>
+    <text x="40" y="238" class="mono" font-size="11" fill="#8ff0bf">▲ 12,4% vs. ontem</text>
+    <path d="M150 236 L162 226 L174 230 L186 214 L198 220 L210 206" fill="none" stroke="url(#spark)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+
+    <!-- card 2 -->
+    <rect x="240" y="156" width="204" height="96" rx="10" fill="#0f1a15" stroke="#222f29"/>
+    <text x="256" y="182" font-size="12" fill="#718078">Taxa de erro</text>
+    <text x="256" y="216" class="mono" font-size="30" font-weight="700" fill="#e7b957">1,7%</text>
+    <text x="256" y="238" class="mono" font-size="11" fill="#8ff0bf">▼ 0,6% vs. ontem</text>
+    <path d="M366 214 L378 222 L390 210 L402 220 L414 208 L426 216" fill="none" stroke="#e7b957" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+
+    <!-- card 3 -->
+    <rect x="456" y="156" width="204" height="96" rx="10" fill="#0f1a15" stroke="#222f29"/>
+    <text x="472" y="182" font-size="12" fill="#718078">Latência p95</text>
+    <text x="472" y="216" class="mono" font-size="30" font-weight="700" fill="#e8f0eb">602<span font-size="14" fill="#718078"> ms</span></text>
+    <text x="472" y="238" class="mono" font-size="11" fill="#8ff0bf">▲ 3,1% vs. ontem</text>
+    <path d="M582 232 L594 224 L606 228 L618 212 L630 218 L642 208" fill="none" stroke="url(#spark)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+
+    <!-- card 4 -->
+    <rect x="672" y="156" width="204" height="96" rx="10" fill="#0f1a15" stroke="#222f29"/>
+    <text x="688" y="182" font-size="12" fill="#718078">Exceções</text>
+    <text x="688" y="216" class="mono" font-size="30" font-weight="700" fill="#f16d76">7</text>
+    <text x="688" y="238" class="mono" font-size="11" fill="#f16d76">▲ 2 novas hoje</text>
+    <path d="M798 206 L810 220 L822 212 L834 224 L846 214 L858 222" fill="none" stroke="#f16d76" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+  </g>
+
+  <!-- chart window -->
+  <rect x="24" y="266" width="556" height="230" rx="10" fill="#0f1a15" stroke="#222f29"/>
+  <text x="40" y="290" class="ui" font-size="12" fill="#718078">Requisições por hora (7 dias)</text>
+  <g stroke="#1a2723" stroke-width="1">
+    <path d="M40 330 H564 M40 366 H564 M40 402 H564 M40 438 H564"/>
+  </g>
+  <!-- area -->
+  <path d="M40 438 L40 400 L88 388 L136 404 L184 358 L232 372 L280 336 L328 350 L376 312 L424 330 L472 300 L520 318 L564 296 L564 438 Z"
+        fill="#42c98a" opacity="0.12"/>
+  <path d="M40 400 L88 388 L136 404 L184 358 L232 372 L280 336 L328 350 L376 312 L424 330 L472 300 L520 318 L564 296"
+        fill="none" stroke="url(#spark)" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round"/>
+  <circle cx="472" cy="300" r="4" fill="#8ff0bf"/>
+  <g class="mono" font-size="10" fill="#52645a">
+    <text x="40" y="458">00:00</text>
+    <text x="180" y="458">06:00</text>
+    <text x="320" y="458">12:00</text>
+    <text x="460" y="458">18:00</text>
+    <text x="530" y="458">24:00</text>
+  </g>
+
+  <!-- route table -->
+  <rect x="592" y="266" width="284" height="230" rx="10" fill="#0f1a15" stroke="#222f29"/>
+  <text x="608" y="290" class="ui" font-size="12" fill="#718078">Rotas — saúde</text>
+  <g class="mono" font-size="11">
+    <text x="608" y="316" fill="#718078">MÉTODO</text>
+    <text x="676" y="316" fill="#718078">ROTA</text>
+    <text x="836" y="316" fill="#718078">p95</text>
+
+    <text x="608" y="342" fill="#42c98a">GET</text>
+    <text x="676" y="342" fill="#c9d6cf">/api/v1/payments</text>
+    <text x="836" y="342" fill="#8ff0bf">128ms</text>
+
+    <text x="608" y="366" fill="#42c98a">POST</text>
+    <text x="676" y="366" fill="#c9d6cf">/api/v1/payments</text>
+    <text x="836" y="366" fill="#8ff0bf">602ms</text>
+
+    <text x="608" y="390" fill="#e7b957">GET</text>
+    <text x="676" y="390" fill="#c9d6cf">/api/v1/refund</text>
+    <text x="836" y="390" fill="#e7b957">340ms</text>
+
+    <text x="608" y="414" fill="#42c98a">GET</text>
+    <text x="676" y="414" fill="#c9d6cf">/api/v1/wallets</text>
+    <text x="836" y="414" fill="#8ff0bf">96ms</text>
+
+    <text x="608" y="438" fill="#f16d76">POST</text>
+    <text x="676" y="438" fill="#c9d6cf">/api/v1/charge</text>
+    <text x="836" y="438" fill="#f16d76">5xx</text>
+
+    <text x="608" y="462" fill="#42c98a">GET</text>
+    <text x="676" y="462" fill="#c9d6cf">/health</text>
+    <text x="836" y="462" fill="#8ff0bf">4ms</text>
+  </g>
+</svg>
