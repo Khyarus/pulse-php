@@ -61,19 +61,29 @@ final class Dashboard
 
     public function render(): void
     {
+        $this->emit($this->handle());
+    }
+
+    public function renderJson(): void
+    {
+        $this->emit($this->handleJson());
+    }
+
+    /**
+     * Builds the dashboard HTML response without emitting it.
+     *
+     * Framework integrations (e.g. Laravel) must use this method so the HTTP
+     * status and headers are returned explicitly instead of relying on the
+     * global {@see http_response_code()} side channel.
+     */
+    public function handle(): DashboardResponse
+    {
         $denialStatus = $this->getDenialStatus();
         if ($denialStatus !== null) {
-            $this->renderAccessDenied($denialStatus);
-
-            return;
+            return $this->accessDeniedResponse($denialStatus);
         }
 
         extract($this->collectDashboardData(), EXTR_SKIP);
-
-        if (!headers_sent()) {
-            header('Content-Type: text/html; charset=UTF-8');
-            header('Cache-Control: no-store, private');
-        }
 
         $requestCount = number_format($stats['requests_total']);
         $averageDuration = number_format($stats['avg_response_ms'], 2);
@@ -88,35 +98,49 @@ final class Dashboard
             'generatedAt' => gmdate('c'),
         ], JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_THROW_ON_ERROR);
 
+        ob_start();
         require __DIR__ . '/resources/views/dashboard.php';
+        $html = (string) ob_get_clean();
+
+        return new DashboardResponse(200, $html, [
+            'Content-Type' => 'text/html; charset=UTF-8',
+            'Cache-Control' => 'no-store, private',
+        ]);
     }
 
-    public function renderJson(): void
+    /**
+     * Builds the dashboard JSON snapshot without emitting it.
+     */
+    public function handleJson(): DashboardResponse
     {
         $denialStatus = $this->getDenialStatus();
-        if (!headers_sent()) {
-            header('Content-Type: application/json; charset=UTF-8');
-            header('Cache-Control: no-store, private');
-            if ($denialStatus === 401) {
-                header('WWW-Authenticate: Basic realm="PulsePHP Dashboard", charset="UTF-8"');
-            }
-        }
+
+        $headers = [
+            'Content-Type' => 'application/json; charset=UTF-8',
+            'Cache-Control' => 'no-store, private',
+        ];
 
         if ($denialStatus !== null) {
-            http_response_code($denialStatus);
-            echo json_encode(['error' => 'Access denied'], JSON_THROW_ON_ERROR);
+            if ($denialStatus === 401) {
+                $headers['WWW-Authenticate'] = 'Basic realm="PulsePHP Dashboard", charset="UTF-8"';
+            }
 
-            return;
+            return new DashboardResponse(
+                $denialStatus,
+                json_encode(['error' => 'Access denied'], JSON_THROW_ON_ERROR),
+                $headers
+            );
         }
 
         $data = $this->collectDashboardData();
-        echo json_encode([
+
+        return new DashboardResponse(200, json_encode([
             'stats' => $data['stats'],
             'chartData' => $data['chartData'],
             'routeCards' => $data['routeCards'],
             'exceptions' => $data['exceptions'],
             'generatedAt' => gmdate('c'),
-        ], JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_THROW_ON_ERROR);
+        ], JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_THROW_ON_ERROR), $headers);
     }
 
     /** @return array<string, mixed> */
@@ -353,19 +377,34 @@ final class Dashboard
         return explode(':', $decoded, 2);
     }
 
-    private function renderAccessDenied(int $status): void
+    private function accessDeniedResponse(int $status): DashboardResponse
     {
-        http_response_code($status);
+        $headers = [
+            'Content-Type' => 'text/html; charset=UTF-8',
+            'Cache-Control' => 'no-store, private',
+        ];
+        if ($status === 401) {
+            $headers['WWW-Authenticate'] = 'Basic realm="PulsePHP Dashboard", charset="UTF-8"';
+        }
 
-        if (!headers_sent()) {
-            header('Content-Type: text/html; charset=UTF-8');
-            header('Cache-Control: no-store, private');
-            if ($status === 401) {
-                header('WWW-Authenticate: Basic realm="PulsePHP Dashboard", charset="UTF-8"');
+        return new DashboardResponse(
+            $status,
+            '<!doctype html><html lang="en"><meta charset="utf-8">'
+            . '<title>Access denied</title><body><h1>Access denied</h1></body></html>',
+            $headers
+        );
+    }
+
+    private function emit(DashboardResponse $response): void
+    {
+        foreach ($response->headers() as $name => $value) {
+            if (!headers_sent()) {
+                header($name . ': ' . $value);
             }
         }
 
-        echo '<!doctype html><html lang="en"><meta charset="utf-8">'
-            . '<title>Access denied</title><body><h1>Access denied</h1></body></html>';
+        http_response_code($response->status);
+
+        echo $response->body;
     }
 }

@@ -31,25 +31,15 @@ final class DashboardController extends Controller
             $dashboard->authWithIp($allowedIps);
         }
 
-        ob_start();
-        try {
-            $dashboard->render();
-            $html = (string) ob_get_contents();
-        } finally {
-            ob_end_clean();
-        }
+        $result = $dashboard->handle();
 
-        $status = http_response_code();
-        $response = response($html, is_int($status) ? $status : 200)
-            ->header('Content-Type', 'text/html; charset=UTF-8')
-            ->header('Cache-Control', 'no-store, private');
+        $response = response($result->body, $result->status);
 
-        if ($status === 401
-            && config('pulse.dashboard_user') !== null
-            && config('pulse.dashboard_password') !== null) {
-            $response->header('WWW-Authenticate', 'Basic realm="PulsePHP Dashboard", charset="UTF-8"');
+        foreach ($result->headers() as $name => $value) {
+            $response->header($name, $value);
         }
 
         return $response;
     }
 }
+
