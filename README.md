@@ -19,10 +19,9 @@
 
 <!-- BADGES -->
 <p align="center">
-  <a href="LICENSE"><img src="https://img.shields.io/badge/licença-MIT-42c98a?style=for-the-badge" alt="Licença"></a>
-  <a href="https://github.com/jgcansi/pulse-php/releases"><img src="https://img.shields.io/badge/versão-1.0.0--alpha-3aa0ff?style=for-the-badge" alt="Versão"></a>
+  <a href="https://github.com/jgcansi/pulse-php/releases"><img src="https://img.shields.io/badge/versão-1.0.0--beta.1-3aa0ff?style=for-the-badge" alt="Versão"></a>
   <a href="https://github.com/jgcansi/pulse-php/actions/workflows/tests.yml"><img src="https://img.shields.io/badge/testes-passing-42c98a?style=for-the-badge" alt="Testes"></a>
-  <a href="#-testes"><img src="https://img.shields.io/badge/cobertura-98%25-42c98a?style=for-the-badge" alt="Cobertura de testes"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/licença-MIT-42c98a?style=for-the-badge" alt="Licença"></a>
 </p>
 
 <p align="center">
@@ -35,9 +34,9 @@
 
 <p align="center">
   <a href="#-demonstração-em-ação"><img src="https://img.shields.io/badge/▶_Ver_Demo-42c98a?style=for-the-badge" alt="Ver demo"></a>
-  <a href="#-instalação"><img src="https://img.shields.io/badge/⚙_Instalação-3aa0ff?style=for-the-badge" alt="Instalação"></a>
+    <a href="#-instalação"><img src="https://img.shields.io/badge/⚙_Instalação-3aa0ff?style=for-the-badge" alt="Instalação"></a>
   <a href="#-uso"><img src="https://img.shields.io/badge/📚_Documentação-555?style=for-the-badge" alt="Documentação"></a>
-    <a href="https://github.com/jgcansi/pulse-php/discussions"><img src="https://img.shields.io/badge/💬_Discussões-5865F2?style=for-the-badge" alt="Discussões"></a>
+  <a href="https://github.com/jgcansi/pulse-php/discussions"><img src="https://img.shields.io/badge/💬_Discussões-5865F2?style=for-the-badge" alt="Discussões"></a>
 </p>
 
 <p align="center">
@@ -184,11 +183,15 @@ php -m | grep -i sqlite  # extensões pdo e pdo_sqlite
 
 ### Instale pelo Composer
 
+> A versão atual é um **pré-lançamento** (`beta.1`). Por isso o Composer exige que você permita explicitamente versões instáveis:
+
 ```bash
-composer require jgcansi/pulse-php
+composer require jgcansi/pulse-php:^1.0@beta
 ```
 
-**Requisitos:** PHP 8.1+ com as extensões `pdo` e `pdo_sqlite`.
+Quando a versão estável `1.0.0` for publicada, o comando volta a ser simplesmente `composer require jgcansi/pulse-php`.
+
+**Requisitos:** PHP 8.1+ com as extensões `pdo`, `pdo_sqlite` e `json` (esta última já vem habilitada por padrão no PHP 8+).
 
 ---
 
@@ -239,14 +242,14 @@ O exemplo restringe o acesso a `127.0.0.1` e `::1`; quando as variáveis Basic A
 
 ### Gerar tráfego de exemplo
 
-Em outra janela do terminal, simule requisições para ver o dashboard ganhar vida:
+Em outra janela do terminal, simule requisições para ver o dashboard ganhar vida (a partir da raiz do repositório):
 
 ```bash
 # Contínuo (Ctrl+C para parar)
-php traffic.php
+php examples/traffic.php
 
 # Execução controlada — útil para demos e GIFs
-php traffic.php --iterations=10
+php examples/traffic.php --iterations=10
 ```
 
 > O script grava cada request imediatamente em `storage/database.sqlite`.
@@ -344,7 +347,15 @@ As rotas web e API recebem contexto com o nome da rota resolvida ou seu URI. O s
 | `pulse.database_path` | `storage/pulse.sqlite` | Caminho do banco SQLite. |
 | `pulse.service_name` | `default` | Nome do serviço exibido no dashboard. |
 | `pulse.dashboard_path` | `pulse` | Rota do dashboard no Laravel. |
+| `pulse.dashboard_middleware` | `['web']` | Middleware aplicado à rota do dashboard. |
+| `pulse.dashboard_user` | `null` | Usuário do Basic Auth do dashboard (`.env: PULSE_DASHBOARD_USER`). |
+| `pulse.dashboard_password` | `null` | Senha do Basic Auth do dashboard (`.env: PULSE_DASHBOARD_PASSWORD`). |
+| `pulse.dashboard_allowed_ips` | `[]` | Whitelist de IPs do dashboard (`.env: PULSE_DASHBOARD_IPS`). |
 | `pulse.collect_requests` | `true` | Captura de requisições web. |
+| `pulse.collect_exceptions` | `true` | Captura de exceções. |
+| `pulse.collect_queries` | `true` | Captura de consultas SQL. |
+| `pulse.collect_outbound_requests` | `true` | Captura de chamadas HTTP externas (cliente `Http` do Laravel). |
+
 ---
 
 ## 🧪 Testes

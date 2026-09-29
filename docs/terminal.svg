@@ -17,10 +17,10 @@
 
   <g class="mono" font-size="15">
     <text x="28" y="72" fill="#42c98a">➜</text>
-    <text x="48" y="72" fill="#e8f0eb">composer require jgcansi/pulse-php</text>
+    <text x="48" y="72" fill="#e8f0eb">composer require jgcansi/pulse-php:^1.0@beta</text>
 
-    <text x="28" y="104" fill="#52645a">Using version ^1.0 for jgcansi/pulse-php</text>
-    <text x="28" y="126" fill="#52645a">  - Installing jgcansi/pulse-php (1.0.0)</text>
+    <text x="28" y="104" fill="#52645a">Using version ^1.0@beta for jgcansi/pulse-php</text>
+    <text x="28" y="126" fill="#52645a">  - Installing jgcansi/pulse-php (1.0.0-beta.1)</text>
     <text x="28" y="148" fill="#42c98a">Package installed successfully.</text>
 
     <text x="28" y="192" fill="#42c98a">➜</text>
@@ -29,7 +29,7 @@
     <text x="28" y="242" fill="#52645a">Listening on http://127.0.0.1:8000</text>
 
     <text x="28" y="286" fill="#42c98a">➜</text>
-    <text x="48" y="286" fill="#e8f0eb">php traffic.php --iterations=8</text>
+    <text x="48" y="286" fill="#e8f0eb">php examples/traffic.php --iterations=8</text>
     <text x="28" y="314" fill="#8ff0bf">[12:11:56] POST /api/v1/payments - 602ms (200 OK) [gateway-pagamento]</text>
   </g>
 </svg>
