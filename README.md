@@ -368,9 +368,9 @@ vendor/bin/phpunit
 A suíte roda no GitHub Actions em **PHP 8.1, 8.2 e 8.3**.
 
 ```text
-..............                        14 / 14 (100%)
+........................               24 / 24 (100%)
 
-OK (14 tests, 114 assertions)
+OK (24 tests, 166 assertions)
 ```
 
 ---
