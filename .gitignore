@@ -1,3 +1,37 @@
+# Dependências gerenciadas pelo Composer
 /vendor/
+# Não versionamos o lock em bibliotecas — apenas aplicações devem travá-lo
+composer.lock
+
+# Cache e artefatos de teste
 .phpunit.cache/
+.phpunit.result.cache
+build/
+coverage/
+
+# Banco de dados local e tráfego de exemplo
 /storage/*.sqlite*
+
+# Variáveis de ambiente (nunca versionar segredos)
+.env
+.env.*
+!.env.example
+
+# Configurações de IDE e editores
+.idea/
+.vscode/
+*.iml
+*.sublime-*
+*.swp
+*.swo
+*~
+
+# Arquivos de SO
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Logs e temporários
+*.log
+*.cache
+/tmp/
