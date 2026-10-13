@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace PulsePHP\Laravel\Collectors;
 
+use Closure;
 use Illuminate\Http\Client\Events\ConnectionFailed;
 use Illuminate\Http\Client\Events\RequestSending;
 use Illuminate\Http\Client\Events\ResponseReceived;
@@ -15,7 +16,8 @@ final class OutboundHttpCollector
     /** @var WeakMap<object, int> */
     private WeakMap $startedAt;
 
-    public function __construct(private Pulse $pulse)
+    /** @param Pulse|Closure(): Pulse $pulse Resolved lazily when given a closure. */
+    public function __construct(private Pulse|Closure $pulse)
     {
         $this->startedAt = new WeakMap();
     }
@@ -40,7 +42,8 @@ final class OutboundHttpCollector
         $startedAt = $this->startedAt[$request] ?? hrtime(true);
         unset($this->startedAt[$request]);
 
-        $this->pulse->recordOutboundRequest(
+        $pulse = $this->pulse instanceof Closure ? ($this->pulse)() : $this->pulse;
+        $pulse->recordOutboundRequest(
             $request->url(),
             $request->method(),
             $statusCode,

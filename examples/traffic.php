@@ -76,8 +76,8 @@ while (true) {
     [$service, $method, $route] = $routes[array_rand($routes)];
     $durationMs = random_int(40, 1200);
     $statusCode = $route === "/api/v1/checkout" && random_int(1, 100) <= 13 ? 500 : 200;
-
-    $pulse->setContext($service, $route, $method);
+    // Each simulated request is its own trace, like a real web request.
+    $pulse->beginTrace($route, $method, $route, $service);
     usleep($durationMs * 1000);
     $pulse->recordRequest(
         $route,

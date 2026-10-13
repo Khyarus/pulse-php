@@ -19,7 +19,7 @@
 
 <!-- BADGES -->
 <p align="center">
-  <a href="https://github.com/jgcansi/pulse-php/releases"><img src="https://img.shields.io/badge/versão-1.0.0--beta.1-3aa0ff?style=for-the-badge" alt="Versão"></a>
+  <a href="https://github.com/jgcansi/pulse-php/releases"><img src="https://img.shields.io/badge/versão-1.0.0-3aa0ff?style=for-the-badge" alt="Versão"></a>
   <a href="https://github.com/jgcansi/pulse-php/actions/workflows/tests.yml"><img src="https://img.shields.io/badge/testes-passing-42c98a?style=for-the-badge" alt="Testes"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/licença-MIT-42c98a?style=for-the-badge" alt="Licença"></a>
 </p>
@@ -124,16 +124,20 @@
   <img src="./docs/features.svg" alt="Recursos do PulsePHP" width="90%">
 </p>
 
-- [x] Buffer em memória com gravação em lote no encerramento do processo.
+- [x] Buffer em memória com gravação em lote, seguro para filas, Octane e Horizon.
 - [x] Normalização e catalogação de SQL para agrupar consultas equivalentes.
 - [x] Timers para medir duração e variação de memória de operações.
-- [x] Captura automática de requisições web e exceções.
-- [x] Contexto de serviço e de rota em cada requisição.
-- [x] Captura automática de chamadas do cliente `Http` do Laravel (método, status, destino, duração).
-- [x] Dashboard ao vivo com filtros por período, serviço e rota.
+- [x] Captura automática de requisições web, exceções e jobs de fila.
+- [x] **Traces**: request, queries, spans, chamadas externas e exceções correlacionados, com página de detalhe.
+- [x] **Detecção de N+1** e **exceções agrupadas** por classe e local.
+- [x] Latência **p95/p99** no resumo e por rota.
+- [x] Captura de chamadas do cliente `Http` do Laravel e do **Guzzle**; queries em PHP puro via **`TracedPDO`**.
+- [x] **Retenção** configurável, **sampling** e lista de caminhos ignorados.
+- [x] **Alertas** por webhook (JSON/Slack) e e-mail.
+- [x] Dashboard ao vivo com filtros por período, serviço e rota — assets embutidos, sem CDN.
 - [x] Segurança por padrão: dashboard negado até configurar uma política de acesso.
 - [x] Integração opcional com Laravel 9+ via auto-discovery.
-- [x] Dados sempre locais — nada sai da sua máquina.
+- [x] Dados sempre locais — nada sai da sua máquina (exceto os alertas que você configurar).
 
 <table>
   <tr>
@@ -159,8 +163,8 @@
 | **Core** | PHP 8.1+ | Núcleo standalone, sem dependência de framework. |
 | **Integração** | Laravel 9+ | Service provider com auto-discovery (opcional). |
 | **Dados** | SQLite (`pdo_sqlite`) | Armazenamento local em arquivo único. |
-| **Dashboard** | HTML + JS | Filtros, gráficos, sparklines e auto-refresh. |
-| **Testes** | PHPUnit | Suíte automatizada em PHP 8.1, 8.2 e 8.3. |
+| **Dashboard** | HTML + Alpine.js + Chart.js | Filtros, gráficos, sparklines e auto-refresh; assets embutidos no pacote. |
+| **Testes** | PHPUnit + Testbench | Suíte automatizada em PHP 8.1 a 8.4, incluindo integração com Laravel. |
 
 <p align="center">
   <img src="https://img.shields.io/badge/PHP-777BB4?style=for-the-badge&logo=php&logoColor=white" alt="PHP">
@@ -183,13 +187,9 @@ php -m | grep -i sqlite  # extensões pdo e pdo_sqlite
 
 ### Instale pelo Composer
 
-> A versão atual é um **pré-lançamento** (`beta.1`). Por isso o Composer exige que você permita explicitamente versões instáveis:
-
 ```bash
-composer require jgcansi/pulse-php:^1.0@beta
+composer require jgcansi/pulse-php
 ```
-
-Quando a versão estável `1.0.0` for publicada, o comando volta a ser simplesmente `composer require jgcansi/pulse-php`.
 
 **Requisitos:** PHP 8.1+ com as extensões `pdo`, `pdo_sqlite` e `json` (esta última já vem habilitada por padrão no PHP 8+).
 
@@ -210,7 +210,11 @@ require __DIR__ . '/vendor/autoload.php';
 
 use PulsePHP\Pulse;
 
-Pulse::init(__DIR__ . '/storage/pulse.sqlite');
+Pulse::init(__DIR__ . '/storage/pulse.sqlite', options: [
+    'sample_rate' => 1.0,              // fração de requisições gravadas
+    'ignore_paths' => ['/health'],     // nunca gravados (* é curinga)
+    'retention_days' => 7,             // limpeza automática de dados antigos
+]);
 
 pulse('pedido.criado');
 pulse_metric('valor_venda', 250.00, ['categoria' => 'eletronicos']);
@@ -264,16 +268,60 @@ Com o tráfego rodando, o dashboard ganha vida em segundos — incluindo a detec
 
 ### Como instrumentar sua aplicação
 
-Em PHP puro, requisições web e exceções são capturadas automaticamente pelos coletores do `Pulse::init()`. Consultas SQL, porém, são registradas explicitamente:
+Em PHP puro, requisições web e exceções são capturadas automaticamente pelos coletores do `Pulse::init()`. Cada requisição vira um **trace**: tudo o que ela gerar fica correlacionado e aparece na página de detalhe do dashboard.
+
+**Queries SQL** — troque o `PDO` por `TracedPDO` (mesma API). Só o SQL normalizado e a duração são gravados; os valores nunca saem da aplicação:
 
 ```php
-Pulse::getInstance()->recordQuery(
-    'SELECT * FROM users WHERE id = 42',
-    1.25 // duração em ms
-);
+use PulsePHP\Database\TracedPDO;
+
+$pdo = new TracedPDO('mysql:host=localhost;dbname=app', $user, $password);
 ```
 
-Chamadas outbound só são interceptadas quando passam pelo cliente HTTP do Laravel; Guzzle usado diretamente não é capturado.
+Ou registre manualmente:
+
+```php
+Pulse::getInstance()->recordQuery('SELECT * FROM users WHERE id = 42', 1.25);
+```
+
+**Chamadas HTTP com Guzzle** — adicione o middleware ao `HandlerStack`:
+
+```php
+use GuzzleHttp\Client;
+use GuzzleHttp\HandlerStack;
+use PulsePHP\Http\GuzzleMiddleware;
+
+$stack = HandlerStack::create();
+$stack->push(GuzzleMiddleware::create(), 'pulse');
+$client = new Client(['handler' => $stack]);
+```
+
+Credenciais e query string são removidas da URL antes de gravar.
+
+**Workers de longa duração** (loops de fila próprios, ReactPHP etc.) — marque cada unidade de trabalho e grave o buffer ao final:
+
+```php
+$pulse = Pulse::getInstance();
+$pulse->beginTrace('job:enviar-email', 'JOB');
+// ... trabalho ...
+$pulse->writeBuffer();
+```
+
+### Retenção e alertas (CLI)
+
+O pacote instala o binário `vendor/bin/pulse`. Agende-o no cron:
+
+```bash
+# Apaga telemetria com mais de 7 dias (diariamente)
+vendor/bin/pulse prune --db=storage/pulse.sqlite --days=7
+
+# Avalia alertas e notifica um webhook (a cada minuto)
+vendor/bin/pulse check --db=storage/pulse.sqlite \
+    --webhook=https://hooks.slack.com/services/... --format=slack \
+    --error-rate=5 --exceptions=10 --p95=2000
+```
+
+Regras: taxa de 5xx, número de exceções e latência p95 numa janela (`--window`, padrão 5 min), com cooldown (`--cooldown`, padrão 30 min). Use `off` para desligar uma regra e `--dry-run` para testar sem notificar.
 
 Aplicações que instanciam o Dashboard diretamente devem configurar pelo menos uma política:
 
@@ -293,11 +341,13 @@ $dashboard->render();
 
 O service provider é **descoberto automaticamente** pelo Composer. Nenhum passo extra de registro.
 
-### 1. Publique a configuração
+### 1. Instale
 
 ```bash
-php artisan vendor:publish --tag=pulse-config
+php artisan pulse:install
 ```
+
+O comando publica `config/pulse.php` e mostra os próximos passos.
 
 Por padrão, o Dashboard fica em **`/pulse`** e o banco em `storage/pulse.sqlite` (ajustável via `database_path` em `config/pulse.php`).
 
@@ -322,7 +372,25 @@ PULSE_SERVICE_NAME=api-pagamentos
 
 Quando configuradas, as credenciais e a whitelist são verificadas além do Gate. O arquivo publicado também permite ajustar `enabled`, rota, middleware e coletores.
 
-### 3. Pronto — a captura é automática
+### 3. Agende a manutenção
+
+```php
+// routes/console.php (Laravel 11+; no 9/10 use o schedule() de app/Console/Kernel.php)
+use Illuminate\Support\Facades\Schedule;
+
+Schedule::command('pulse:prune')->daily();
+Schedule::command('pulse:check')->everyMinute(); // com PULSE_ALERTS_ENABLED=true
+```
+
+Alertas usam `PULSE_ALERT_WEBHOOK` (JSON ou Slack) e/ou `PULSE_ALERT_MAIL_TO` (mailer do Laravel).
+
+### 4. Pronto — a captura é automática
+
+- **Requisições** dos grupos `web` e `api`, com nome da rota, sem query string.
+- **Exceções** reportadas pelo Laravel (HTTP, jobs e console). O que está em `dontReport` (404, validação etc.) é ignorado.
+- **Queries** via `DB::listen`, correlacionadas ao request ou job.
+- **Jobs de fila** viram traces próprios (`job:App\Jobs\...`) com span de duração.
+- O buffer é gravado ao fim de cada request e de cada job, então **Octane, Horizon e `queue:work`** não acumulam memória.
 
 As chamadas feitas com `Illuminate\Support\Facades\Http` aparecem como span `http.outbound:{host}` **e** na tabela de chamadas externas, com método, status e duração. Credenciais e query string são **removidas** da URL persistida por segurança:
 
@@ -333,7 +401,7 @@ $response = Http::withToken(config('services.stripe.secret'))
     ->get('https://api.stripe.com/v1/balance');
 ```
 
-> Sem `pulse_start()` manual ao redor das chamadas — o middleware e os eventos do cliente HTTP cuidam de tudo. A captura cobre o cliente `Http` do Laravel; chamadas Guzzle diretas não passam por esse interceptor.
+> Sem `pulse_start()` manual ao redor das chamadas — o middleware e os eventos do cliente HTTP cuidam de tudo. A captura cobre o cliente `Http` do Laravel; para Guzzle usado diretamente, adicione o `GuzzleMiddleware` (veja [Como instrumentar](#como-instrumentar-sua-aplicação)).
 
 As rotas web e API recebem contexto com o nome da rota resolvida ou seu URI. O serviço usa `PULSE_SERVICE_NAME`, com fallback para `APP_NAME` e depois `default`. Bancos SQLite v1 existentes recebem as novas colunas na inicialização, sem apagar os registros anteriores.
 
@@ -344,9 +412,9 @@ As rotas web e API recebem contexto com o nome da rota resolvida ou seu URI. O s
 | Variável / chave | Padrão | Descrição |
 | --- | --- | --- |
 | `pulse.enabled` | `true` | Liga/desliga toda a coleta. |
-| `pulse.database_path` | `storage/pulse.sqlite` | Caminho do banco SQLite. |
+| `pulse.database_path` | `storage/pulse.sqlite` | Caminho do banco SQLite (`PULSE_DB_PATH`). |
 | `pulse.service_name` | `default` | Nome do serviço exibido no dashboard. |
-| `pulse.dashboard_path` | `pulse` | Rota do dashboard no Laravel. |
+| `pulse.dashboard_path` | `pulse` | Rota do dashboard no Laravel (`PULSE_PATH`). O endpoint ao vivo fica em `{path}/data`. |
 | `pulse.dashboard_middleware` | `['web']` | Middleware aplicado à rota do dashboard. |
 | `pulse.dashboard_user` | `null` | Usuário do Basic Auth do dashboard (`.env: PULSE_DASHBOARD_USER`). |
 | `pulse.dashboard_password` | `null` | Senha do Basic Auth do dashboard (`.env: PULSE_DASHBOARD_PASSWORD`). |
@@ -355,6 +423,14 @@ As rotas web e API recebem contexto com o nome da rota resolvida ou seu URI. O s
 | `pulse.collect_exceptions` | `true` | Captura de exceções. |
 | `pulse.collect_queries` | `true` | Captura de consultas SQL. |
 | `pulse.collect_outbound_requests` | `true` | Captura de chamadas HTTP externas (cliente `Http` do Laravel). |
+| `pulse.collect_jobs` | `true` | Traces e spans para jobs de fila. |
+| `pulse.sample_rate` | `1.0` | Fração de requisições/jobs gravados (`PULSE_SAMPLE_RATE`). Exceções sempre são gravadas. |
+| `pulse.ignore_paths` | `/up,/health,...` | Caminhos nunca gravados, `*` é curinga (`PULSE_IGNORE_PATHS`). O dashboard é sempre ignorado. |
+| `pulse.max_buffer_size` | `1000` | Registros em memória que forçam uma gravação antecipada. |
+| `pulse.n_plus_one_threshold` | `5` | Repetições da mesma query num trace para sinalizar N+1. |
+| `pulse.retention_days` | `7` | Dias de telemetria mantidos (`PULSE_RETENTION_DAYS`). |
+| `pulse.prune_lottery` | `[1, 200]` | Chance de limpar dados antigos durante uma gravação. |
+| `pulse.alerts.*` | desligado | Regras, janela, cooldown, webhook e e-mail dos alertas (`PULSE_ALERTS_ENABLED`, `PULSE_ALERT_*`). |
 
 ---
 
@@ -365,12 +441,18 @@ composer install
 vendor/bin/phpunit
 ```
 
-A suíte roda no GitHub Actions em **PHP 8.1, 8.2 e 8.3**.
+A suíte roda no GitHub Actions em **PHP 8.1 a 8.4**. Os testes de integração com Laravel (`--testsuite Laravel`) usam `orchestra/testbench` e rodam a partir do PHP 8.2.
+
+Para alterar classes CSS do dashboard, recompile o stylesheet embutido (requer Node.js):
+
+```bash
+composer build:assets
+```
 
 ```text
-........................               24 / 24 (100%)
+...........................................................  59 / 59 (100%)
 
-OK (24 tests, 166 assertions)
+OK (59 tests, 321 assertions)
 ```
 
 ---
@@ -381,9 +463,11 @@ OK (24 tests, 166 assertions)
 - [x] Normalização e catalogação de SQL
 - [x] Dashboard ao vivo com filtros e widgets
 - [x] Integração opcional com Laravel 9+
+- [x] Retenção configurável e limpeza do banco
+- [x] Alertas por e-mail / webhook
+- [x] Traces por request/job, detecção de N+1 e percentis
 - [ ] Exportação de traces em formato OpenTelemetry
-- [ ] Retenção configurável e rotação do banco
-- [ ] Alertas por e-mail / webhook
+- [ ] Captura de comandos Artisan agendados
 
 Veja os [issues abertos](https://github.com/jgcansi/pulse-php/issues) para o plano completo.
 

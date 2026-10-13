@@ -8,12 +8,25 @@ use Illuminate\Http\Response;
 use Illuminate\Routing\Controller;
 use Illuminate\Support\Facades\Gate;
 use PulsePHP\Dashboard\Dashboard;
+use PulsePHP\Dashboard\DashboardResponse;
 
 final class DashboardController extends Controller
 {
-    public function __invoke(): Response
+    public function show(): Response
     {
-        $dashboard = new Dashboard((string) config('pulse.database_path'));
+        return $this->toResponse($this->dashboard()->handle());
+    }
+
+    public function data(): Response
+    {
+        return $this->toResponse($this->dashboard()->handleJson());
+    }
+
+    private function dashboard(): Dashboard
+    {
+        $dashboard = (new Dashboard((string) config('pulse.database_path')))
+            ->withDataEndpoint(route('pulse.data', [], false))
+            ->withNPlusOneThreshold((int) config('pulse.n_plus_one_threshold', 5));
         $dashboard->authorize(static fn (): bool => Gate::allows('viewPulse'));
 
         $username = config('pulse.dashboard_user');
@@ -31,8 +44,11 @@ final class DashboardController extends Controller
             $dashboard->authWithIp($allowedIps);
         }
 
-        $result = $dashboard->handle();
+        return $dashboard;
+    }
 
+    private function toResponse(DashboardResponse $result): Response
+    {
         $response = response($result->body, $result->status);
 
         foreach ($result->headers() as $name => $value) {
@@ -42,4 +58,3 @@ final class DashboardController extends Controller
         return $response;
     }
 }
-

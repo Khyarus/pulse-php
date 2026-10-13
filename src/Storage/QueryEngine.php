@@ -40,6 +40,8 @@ final class QueryEngine
      * @return array{
      *     requests_total: int,
      *     avg_response_ms: float,
+     *     p95_response_ms: float,
+     *     p99_response_ms: float,
      *     peak_memory_bytes: int,
      *     exceptions_total: int,
      *     exceptions_today: int
@@ -80,12 +82,69 @@ final class QueryEngine
         $statement->execute($parameters);
         $stats = $statement->fetch();
 
+        $percentileParameters = [];
+        $percentileFilter = $this->filterSql('requests', 'pct', $period, $service, $route, $percentileParameters);
+        $percentiles = $this->pdo->prepare(
+            'SELECT MIN(CASE WHEN position >= 0.95 * total THEN duration_ms END) AS p95,
+                    MIN(CASE WHEN position >= 0.99 * total THEN duration_ms END) AS p99
+             FROM (
+                 SELECT requests.duration_ms,
+                        ROW_NUMBER() OVER (ORDER BY requests.duration_ms) AS position,
+                        COUNT(*) OVER () AS total
+                 FROM pulse_requests AS requests
+                 WHERE 1 = 1 ' . $percentileFilter . '
+             )'
+        );
+        $percentiles->execute($percentileParameters);
+        $percentileRow = $percentiles->fetch() ?: [];
+
         return [
             'requests_total' => (int) $stats['requests_total'],
             'avg_response_ms' => (float) $stats['avg_response_ms'],
+            'p95_response_ms' => (float) ($percentileRow['p95'] ?? 0),
+            'p99_response_ms' => (float) ($percentileRow['p99'] ?? 0),
             'peak_memory_bytes' => (int) $stats['peak_memory_bytes'],
             'exceptions_total' => (int) $stats['exceptions_total'],
             'exceptions_today' => (int) $stats['exceptions_today'],
+        ];
+    }
+
+    /**
+     * Aggregates for the last $minutes minutes, used by alert rules.
+     *
+     * @return array{requests: int, server_errors: int, error_rate_percent: float, exceptions: int, p95_ms: float}
+     */
+    public function getWindowStats(int $minutes): array
+    {
+        $modifier = sprintf('-%d minutes', max(1, $minutes));
+        $statement = $this->pdo->prepare(
+            "SELECT
+                (SELECT COUNT(*) FROM pulse_requests WHERE created_at >= datetime('now', :requests_window)) AS requests,
+                (SELECT COUNT(*) FROM pulse_requests WHERE status_code >= 500 AND created_at >= datetime('now', :errors_window)) AS server_errors,
+                (SELECT COUNT(*) FROM pulse_exceptions WHERE created_at >= datetime('now', :exceptions_window)) AS exceptions,
+                (SELECT MIN(CASE WHEN position >= 0.95 * total THEN duration_ms END) FROM (
+                    SELECT duration_ms,
+                           ROW_NUMBER() OVER (ORDER BY duration_ms) AS position,
+                           COUNT(*) OVER () AS total
+                    FROM pulse_requests WHERE created_at >= datetime('now', :p95_window)
+                )) AS p95_ms"
+        );
+        $statement->execute([
+            ':requests_window' => $modifier,
+            ':errors_window' => $modifier,
+            ':exceptions_window' => $modifier,
+            ':p95_window' => $modifier,
+        ]);
+        $row = $statement->fetch();
+        $requests = (int) $row['requests'];
+        $serverErrors = (int) $row['server_errors'];
+
+        return [
+            'requests' => $requests,
+            'server_errors' => $serverErrors,
+            'error_rate_percent' => $requests > 0 ? 100.0 * $serverErrors / $requests : 0.0,
+            'exceptions' => (int) $row['exceptions'],
+            'p95_ms' => (float) ($row['p95_ms'] ?? 0),
         ];
     }
 
@@ -166,7 +225,7 @@ final class QueryEngine
         ], $statement->fetchAll());
     }
 
-    /** @return list<array{message: string, file: string, line: int, service: string, route: string, created_at: string}> */
+    /** @return list<array{class: string, message: string, file: string, line: int, service: string, route: string, trace_id: string, created_at: string}> */
     public function getLatestExceptions(
         int $limit = 10,
         string $period = 'all',
@@ -176,7 +235,7 @@ final class QueryEngine
         $parameters = [];
         $filters = $this->filterSql('exceptions', 'exceptions', $period, $service, $route, $parameters);
         $statement = $this->pdo->prepare(
-            'SELECT message, file, line, service, route, created_at
+            'SELECT class, message, file, line, service, route, trace_id, created_at
              FROM pulse_exceptions AS exceptions
              WHERE 1 = 1 ' . $filters . '
              ORDER BY created_at DESC, id DESC
@@ -189,13 +248,187 @@ final class QueryEngine
         $statement->execute();
 
         return array_map(static fn (array $row): array => [
+            'class' => (string) $row['class'],
             'message' => (string) $row['message'],
             'file' => (string) $row['file'],
             'line' => (int) $row['line'],
             'service' => (string) $row['service'],
             'route' => (string) $row['route'],
+            'trace_id' => (string) $row['trace_id'],
             'created_at' => (string) $row['created_at'],
         ], $statement->fetchAll());
+    }
+
+    /**
+     * Groups exceptions by fingerprint (class + file + line).
+     *
+     * @return list<array{fingerprint: string, class: string, message: string, file: string, line: int, occurrences: int, unhandled: int, routes: int, first_seen: string, last_seen: string, last_trace_id: string}>
+     */
+    public function getExceptionGroups(
+        int $limit = 50,
+        string $period = 'all',
+        ?string $service = null,
+        ?string $route = null
+    ): array {
+        $parameters = [];
+        $filters = $this->filterSql('exceptions', 'groups', $period, $service, $route, $parameters);
+        $statement = $this->pdo->prepare(
+            'SELECT grouped.*,
+                    latest.message, latest.trace_id AS last_trace_id
+             FROM (
+                 SELECT exceptions.fingerprint,
+                        MAX(exceptions.class) AS class,
+                        MAX(exceptions.file) AS file,
+                        MAX(exceptions.line) AS line,
+                        COUNT(*) AS occurrences,
+                        SUM(exceptions.unhandled) AS unhandled,
+                        COUNT(DISTINCT exceptions.route) AS routes,
+                        MIN(exceptions.created_at) AS first_seen,
+                        MAX(exceptions.created_at) AS last_seen,
+                        MAX(exceptions.id) AS last_id
+                 FROM pulse_exceptions AS exceptions
+                 WHERE 1 = 1 ' . $filters . '
+                 GROUP BY exceptions.fingerprint
+             ) AS grouped
+             INNER JOIN pulse_exceptions AS latest ON latest.id = grouped.last_id
+             ORDER BY grouped.last_seen DESC, grouped.occurrences DESC
+             LIMIT :limit'
+        );
+        $statement->bindValue(':limit', $this->normalizeLimit($limit), PDO::PARAM_INT);
+        foreach ($parameters as $name => $value) {
+            $statement->bindValue($name, $value);
+        }
+        $statement->execute();
+
+        return array_map(static fn (array $row): array => [
+            'fingerprint' => (string) $row['fingerprint'],
+            'class' => (string) $row['class'],
+            'message' => (string) $row['message'],
+            'file' => (string) $row['file'],
+            'line' => (int) $row['line'],
+            'occurrences' => (int) $row['occurrences'],
+            'unhandled' => (int) $row['unhandled'],
+            'routes' => (int) $row['routes'],
+            'first_seen' => (string) $row['first_seen'],
+            'last_seen' => (string) $row['last_seen'],
+            'last_trace_id' => (string) $row['last_trace_id'],
+        ], $statement->fetchAll());
+    }
+
+    /**
+     * Finds query patterns executed repeatedly inside the same trace
+     * (request or job) — the classic N+1 symptom.
+     *
+     * @return list<array{normalized_sql: string, service: string, route: string, affected_traces: int, max_per_trace: int, avg_per_trace: float, sample_trace_id: string}>
+     */
+    public function getNPlusOneQueries(
+        int $threshold = 5,
+        int $limit = 20,
+        string $period = 'all',
+        ?string $service = null,
+        ?string $route = null
+    ): array {
+        $parameters = [];
+        $filters = $this->filterSql('queries', 'nplus', $period, $service, $route, $parameters);
+        $statement = $this->pdo->prepare(
+            "SELECT catalog.normalized_sql,
+                    per_trace.service,
+                    per_trace.route,
+                    COUNT(*) AS affected_traces,
+                    MAX(per_trace.executions) AS max_per_trace,
+                    AVG(per_trace.executions) AS avg_per_trace,
+                    MAX(per_trace.trace_id) AS sample_trace_id
+             FROM (
+                 SELECT queries.trace_id, queries.catalog_id, queries.service, queries.route,
+                        COUNT(*) AS executions
+                 FROM pulse_queries AS queries
+                 WHERE queries.trace_id <> '' " . $filters . '
+                 GROUP BY queries.trace_id, queries.catalog_id, queries.service, queries.route
+                 HAVING COUNT(*) >= :threshold
+             ) AS per_trace
+             INNER JOIN pulse_catalog AS catalog ON catalog.id = per_trace.catalog_id
+             GROUP BY per_trace.catalog_id, catalog.normalized_sql, per_trace.service, per_trace.route
+             ORDER BY max_per_trace DESC, affected_traces DESC
+             LIMIT :limit'
+        );
+        $statement->bindValue(':threshold', max(2, $threshold), PDO::PARAM_INT);
+        $statement->bindValue(':limit', $this->normalizeLimit($limit), PDO::PARAM_INT);
+        foreach ($parameters as $name => $value) {
+            $statement->bindValue($name, $value);
+        }
+        $statement->execute();
+
+        return array_map(static fn (array $row): array => [
+            'normalized_sql' => (string) $row['normalized_sql'],
+            'service' => (string) $row['service'],
+            'route' => (string) $row['route'],
+            'affected_traces' => (int) $row['affected_traces'],
+            'max_per_trace' => (int) $row['max_per_trace'],
+            'avg_per_trace' => (float) $row['avg_per_trace'],
+            'sample_trace_id' => (string) $row['sample_trace_id'],
+        ], $statement->fetchAll());
+    }
+
+    /**
+     * Everything recorded for one trace, in recording order.
+     *
+     * @return array{
+     *     trace_id: string,
+     *     request: array<string, mixed>|null,
+     *     spans: list<array<string, mixed>>,
+     *     queries: list<array<string, mixed>>,
+     *     outbound: list<array<string, mixed>>,
+     *     exceptions: list<array<string, mixed>>
+     * }|null
+     */
+    public function getTrace(string $traceId): ?array
+    {
+        if ($traceId === '' || preg_match('/^[a-f0-9]{8,64}$/', $traceId) !== 1) {
+            return null;
+        }
+
+        $fetch = function (string $sql) use ($traceId): array {
+            $statement = $this->pdo->prepare($sql);
+            $statement->execute([':trace_id' => $traceId]);
+
+            return $statement->fetchAll();
+        };
+
+        $requests = $fetch(
+            'SELECT url, method, status_code, duration_ms, memory_bytes, ip, service, route, created_at
+             FROM pulse_requests WHERE trace_id = :trace_id ORDER BY id LIMIT 1'
+        );
+        $spans = $fetch(
+            'SELECT name, duration_ms, memory_bytes, created_at
+             FROM pulse_spans WHERE trace_id = :trace_id ORDER BY id LIMIT 500'
+        );
+        $queries = $fetch(
+            'SELECT catalog.normalized_sql, queries.duration_ms, queries.created_at
+             FROM pulse_queries AS queries
+             INNER JOIN pulse_catalog AS catalog ON catalog.id = queries.catalog_id
+             WHERE queries.trace_id = :trace_id ORDER BY queries.id LIMIT 500'
+        );
+        $outbound = $fetch(
+            'SELECT method, status_code, url, duration_ms, created_at
+             FROM pulse_outbound_requests WHERE trace_id = :trace_id ORDER BY id LIMIT 500'
+        );
+        $exceptions = $fetch(
+            'SELECT class, message, file, line, trace, unhandled, created_at
+             FROM pulse_exceptions WHERE trace_id = :trace_id ORDER BY id LIMIT 500'
+        );
+
+        if ($requests === [] && $spans === [] && $queries === [] && $outbound === [] && $exceptions === []) {
+            return null;
+        }
+
+        return [
+            'trace_id' => $traceId,
+            'request' => $requests[0] ?? null,
+            'spans' => $spans,
+            'queries' => $queries,
+            'outbound' => $outbound,
+            'exceptions' => $exceptions,
+        ];
     }
 
     /** @return list<array{minute: string, requests: int}> */
@@ -222,7 +455,7 @@ final class QueryEngine
         ], $this->getTimeline('pulse_exceptions', 'exceptions', 'exceptions', $period, $service, $route));
     }
 
-    /** @return list<array{url: string, method: string, status_code: int, duration_ms: float, service: string, route: string, created_at: string}> */
+    /** @return list<array{url: string, method: string, status_code: int, duration_ms: float, service: string, route: string, trace_id: string, created_at: string}> */
     public function getRecentRequests(
         int $limit = 100,
         string $period = '1h',
@@ -232,7 +465,7 @@ final class QueryEngine
         return $this->getRecentRows('pulse_requests', $limit, $period, $service, $route);
     }
 
-    /** @return list<array{url: string, method: string, status_code: int, duration_ms: float, service: string, route: string, created_at: string}> */
+    /** @return list<array{url: string, method: string, status_code: int, duration_ms: float, service: string, route: string, trace_id: string, created_at: string}> */
     public function getOutboundRequests(
         int $limit = 100,
         string $period = '1h',
@@ -288,6 +521,7 @@ final class QueryEngine
      *     method: string,
      *     total_requests: int,
      *     avg_duration_ms: float,
+     *     p95_duration_ms: float,
      *     error_rate_percent: float,
      *     unhandled_exceptions: int,
      *     timeline: list<array{timestamp: string, requests: int, avg_duration_ms: float}>
@@ -334,6 +568,30 @@ final class QueryEngine
         $summary->execute($summaryParameters);
         $rows = $summary->fetchAll();
 
+        $percentiles = $this->pdo->prepare(
+            'SELECT service, route, method,
+                    MIN(CASE WHEN position >= 0.95 * total THEN duration_ms END) AS p95
+             FROM (
+                 SELECT service, route, method, duration_ms,
+                        ROW_NUMBER() OVER (PARTITION BY service, route, method ORDER BY duration_ms) AS position,
+                        COUNT(*) OVER (PARTITION BY service, route, method) AS total
+                 FROM pulse_requests
+                 WHERE created_at >= :from AND created_at <= :to'
+            . ($service !== null && $service !== '' ? ' AND service = :service' : '') . '
+             )
+             GROUP BY service, route, method'
+        );
+        $percentileParameters = [':from' => $from, ':to' => $to];
+        if ($service !== null && $service !== '') {
+            $percentileParameters[':service'] = $service;
+        }
+        $percentiles->execute($percentileParameters);
+        $p95ByRoute = [];
+        foreach ($percentiles->fetchAll() as $point) {
+            $key = json_encode([$point['service'], $point['route'], $point['method']], JSON_THROW_ON_ERROR);
+            $p95ByRoute[$key] = (float) $point['p95'];
+        }
+
         $bucketFormat = $this->routeBucketFormat($from, $to);
         $timeline = $this->pdo->prepare(
             'SELECT service, route, method, strftime(:bucket_format, created_at) AS bucket,
@@ -367,7 +625,7 @@ final class QueryEngine
             ];
         }
 
-        return array_map(static function (array $row) use ($seriesByRoute): array {
+        return array_map(static function (array $row) use ($seriesByRoute, $p95ByRoute): array {
             $key = json_encode(
                 [$row['service'], $row['route'], $row['method']],
                 JSON_THROW_ON_ERROR
@@ -379,6 +637,7 @@ final class QueryEngine
                 'method' => (string) $row['method'],
                 'total_requests' => (int) $row['total_requests'],
                 'avg_duration_ms' => (float) $row['avg_duration_ms'],
+                'p95_duration_ms' => $p95ByRoute[$key] ?? 0.0,
                 'error_rate_percent' => (float) $row['error_rate_percent'],
                 'unhandled_exceptions' => (int) $row['unhandled_exceptions'],
                 'timeline' => $seriesByRoute[$key] ?? [],
@@ -443,7 +702,7 @@ final class QueryEngine
         ], $statement->fetchAll());
     }
 
-    /** @return list<array{url: string, method: string, status_code: int, duration_ms: float, service: string, route: string, created_at: string}> */
+    /** @return list<array{url: string, method: string, status_code: int, duration_ms: float, service: string, route: string, trace_id: string, created_at: string}> */
     private function getRecentRows(
         string $table,
         int $limit,
@@ -454,7 +713,7 @@ final class QueryEngine
         $parameters = [];
         $filters = $this->filterSql('records', 'records', $period, $service, $route, $parameters);
         $statement = $this->pdo->prepare(
-            'SELECT url, method, status_code, duration_ms, service, route, created_at '
+            'SELECT url, method, status_code, duration_ms, service, route, trace_id, created_at '
             . 'FROM ' . $table . ' AS records WHERE 1 = 1 ' . $filters
             . ' ORDER BY created_at DESC, id DESC LIMIT :limit'
         );
@@ -471,6 +730,7 @@ final class QueryEngine
             'duration_ms' => (float) $row['duration_ms'],
             'service' => (string) $row['service'],
             'route' => (string) $row['route'],
+            'trace_id' => (string) $row['trace_id'],
             'created_at' => (string) $row['created_at'],
         ], $statement->fetchAll());
     }

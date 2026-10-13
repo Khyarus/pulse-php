@@ -55,11 +55,7 @@ Verifique o `composer.json`:
 composer require jgcansi/pulse-php
 ```
 
-> ℹ️ Como esta é uma versão de pré-lançamento, usuários precisarão permitir instabilidade:
->
-> ```bash
-> composer require jgcansi/pulse-php:^1.0@beta
-> ```
+> ℹ️ Para versões de pré-lançamento (`-beta`, `-rc`), usuários precisam permitir instabilidade, por exemplo `composer require jgcansi/pulse-php:^1.1@beta`. Versões estáveis como `1.0.0` não precisam disso.
 
 ---
 
@@ -95,19 +91,19 @@ O Packagist **não** cria versões sozinho: ele as deriva das **tags do Git**. A
 git checkout main
 git pull origin main
 
-# 2. Crie uma tag anotada para a versão Beta 1
-git tag -a v1.0.0-beta.1 -m "Lançamento da versão Beta 1"
+# 2. Crie uma tag anotada para a versão
+git tag -a v1.0.0 -m "PulsePHP 1.0.0"
 
 # 3. Envie a tag para o GitHub
-git push origin v1.0.0-beta.1
+git push origin v1.0.0
 ```
 
-> 💡 **Por que tag anotada (`-a`)?** Ela guarda autor, data e mensagem — ideal para releases. Uma tag leve (`git tag v1.0.0-beta.1`) só aponta para um commit.
+> 💡 **Por que tag anotada (`-a`)?** Ela guarda autor, data e mensagem — ideal para releases. Uma tag leve (`git tag v1.0.0`) só aponta para um commit.
 
 Após o push, em segundos:
 
 1. O GitHub dispara o webhook.
-2. O Packagist processa a tag e cria a versão `1.0.0-beta.1`.
+2. O Packagist processa a tag e cria a versão `1.0.0`.
 3. O pacote passa a ser instalável nessa versão.
 
 ### Como o Packagist interpreta as tags
@@ -126,9 +122,9 @@ Após o push, em segundos:
 Para gerar também uma **Release** no GitHub com notas de versão:
 
 1. Vá em **Releases → Draft a new release**.
-2. Selecione a tag `v1.0.0-beta.1`.
-3. Use o título `v1.0.0-beta.1` e cole a seção correspondente do [`CHANGELOG.md`](../CHANGELOG.md).
-4. Marque **Set as a pre-release** (por ser Beta).
+2. Selecione a tag `v1.0.0`.
+3. Use o título `v1.0.0` e cole a seção correspondente do [`CHANGELOG.md`](../CHANGELOG.md).
+4. Marque **Set as the latest release**. Use **Set as a pre-release** apenas para tags `-beta`/`-rc`.
 5. Clique em **Publish release**.
 
 ---
@@ -140,7 +136,7 @@ Para gerar também uma **Release** no GitHub com notas de versão:
 composer show jgcansi/pulse-php --all
 
 # Instalar em um projeto de teste
-composer require jgcansi/pulse-php:^1.0@beta
+composer require jgcansi/pulse-php
 ```
 
 Também confira no navegador:

@@ -3,7 +3,6 @@
 declare(strict_types=1);
 
 use PulsePHP\Dashboard\Dashboard;
-use PulsePHP\Pulse;
 
 if (basename((string) ($_SERVER['SCRIPT_NAME'] ?? '')) === basename(__FILE__)) {
     http_response_code(404);
@@ -12,11 +11,11 @@ if (basename((string) ($_SERVER['SCRIPT_NAME'] ?? '')) === basename(__FILE__)) {
 
 require_once dirname(__DIR__) . '/vendor/autoload.php';
 
-$dbPath = dirname(__DIR__) . '/storage/database.sqlite';
-$scriptName = basename((string) ($_SERVER['SCRIPT_NAME'] ?? ''));
-Pulse::init($dbPath, $scriptName !== 'dashboard-data.php');
+// The dashboard does not record its own page views or live-refresh polling,
+// so it never pollutes the metrics it displays.
+$dbPath = getenv('PULSE_DB_PATH') ?: dirname(__DIR__) . '/storage/database.sqlite';
 
-$dashboard = new Dashboard($dbPath);
+$dashboard = (new Dashboard($dbPath))->withDataEndpoint('dashboard-data.php');
 $dashboardUser = getenv('PULSE_DASHBOARD_USER');
 $dashboardPassword = getenv('PULSE_DASHBOARD_PASSWORD');
 
