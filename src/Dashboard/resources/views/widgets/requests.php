@@ -28,7 +28,7 @@
                         <tr>
                             <td class="mono whitespace-nowrap px-3 py-2"><?= $escape($request['created_at']) ?></td>
                             <td class="px-3 py-2"><?= $escape($request['method']) ?></td>
-                            <td class="max-w-72 break-all px-3 py-2"><?= $escape($request['url']) ?></td>
+                            <td class="max-w-72 break-all px-3 py-2"><?php if ($request['trace_id'] !== ''): ?><a class="underline decoration-[#2a3631] underline-offset-2 hover:text-[#42c98a]" href="?trace=<?= $escape(rawurlencode($request['trace_id'])) ?>"><?= $escape($request['url']) ?></a><?php else: ?><?= $escape($request['url']) ?><?php endif; ?></td>
                             <td class="mono px-3 py-2"><?= $escape($request['status_code']) ?></td>
                             <td class="mono px-3 py-2" data-sort-value="<?= $escape($request['duration_ms']) ?>"><?= $escape(number_format($request['duration_ms'], 2)) ?> ms</td>
                             <td class="px-3 py-2"><?= $escape($request['service']) ?></td>

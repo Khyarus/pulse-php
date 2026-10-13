@@ -27,8 +27,11 @@ final class RequestCollector
         $this->collected = true;
         $status = http_response_code();
 
+        // Query strings often carry tokens or personal data; never persist them.
+        $path = parse_url((string) ($_SERVER['REQUEST_URI'] ?? '/'), PHP_URL_PATH);
+
         $this->pulse->recordRequest(
-            (string) ($_SERVER['REQUEST_URI'] ?? '/'),
+            is_string($path) && $path !== '' ? $path : '/',
             (string) ($_SERVER['REQUEST_METHOD'] ?? 'CLI'),
             is_int($status) ? $status : 200,
             (hrtime(true) - $this->startedAt) / 1_000_000,

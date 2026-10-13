@@ -9,6 +9,7 @@ use DateTimeImmutable;
 use DateTimeZone;
 use InvalidArgumentException;
 use PulsePHP\Storage\QueryEngine;
+use PulsePHP\Storage\SQLiteStorage;
 use Throwable;
 
 final class Dashboard
@@ -18,10 +19,34 @@ final class Dashboard
     private ?Closure $authorizationCallback = null;
     private bool $authorizationConfigured = false;
     private QueryEngine $queries;
+    private string $dataEndpoint = 'dashboard-data.php';
+    private int $nPlusOneThreshold = 5;
 
     public function __construct(string $dbPath)
     {
+        // Creates the database on first use and upgrades older schemas, so the
+        // dashboard works before any telemetry has been written.
+        new SQLiteStorage($dbPath);
         $this->queries = new QueryEngine($dbPath);
+    }
+
+    /**
+     * URL the live refresh polls for JSON snapshots. Relative URLs resolve
+     * against the dashboard page; the current query string is appended.
+     */
+    public function withDataEndpoint(string $url): self
+    {
+        $this->dataEndpoint = $url;
+
+        return $this;
+    }
+
+    /** Repetitions of one query pattern inside a trace that flag an N+1. */
+    public function withNPlusOneThreshold(int $threshold): self
+    {
+        $this->nPlusOneThreshold = max(2, $threshold);
+
+        return $this;
     }
 
     public function authWithBasic(string $username, string $password): self
@@ -83,6 +108,11 @@ final class Dashboard
             return $this->accessDeniedResponse($denialStatus);
         }
 
+        $traceId = $_GET['trace'] ?? null;
+        if (is_string($traceId) && $traceId !== '') {
+            return $this->traceResponse($traceId);
+        }
+
         extract($this->collectDashboardData(), EXTR_SKIP);
 
         $requestCount = number_format($stats['requests_total']);
@@ -95,8 +125,14 @@ final class Dashboard
             'chartData' => $chartData,
             'routeCards' => $routeCards,
             'exceptions' => $exceptions,
+            'exceptionGroups' => $exceptionGroups,
             'generatedAt' => gmdate('c'),
         ], JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_THROW_ON_ERROR);
+        $dataEndpointJson = json_encode(
+            $this->dataEndpoint,
+            JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR
+        );
+        $assets = $this->assets();
 
         ob_start();
         require __DIR__ . '/resources/views/dashboard.php';
@@ -139,6 +175,7 @@ final class Dashboard
             'chartData' => $data['chartData'],
             'routeCards' => $data['routeCards'],
             'exceptions' => $data['exceptions'],
+            'exceptionGroups' => $data['exceptionGroups'],
             'generatedAt' => gmdate('c'),
         ], JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_THROW_ON_ERROR), $headers);
     }
@@ -166,6 +203,14 @@ final class Dashboard
         $outboundRequests = $this->queries->getOutboundRequests(100, $period, $selectedService, $selectedRoute);
         $requests = $this->queries->getRecentRequests(100, $period, $selectedService, $selectedRoute);
         $exceptions = $this->queries->getLatestExceptions(100, $period, $selectedService, $selectedRoute);
+        $exceptionGroups = $this->queries->getExceptionGroups(100, $period, $selectedService, $selectedRoute);
+        $nPlusOne = $this->queries->getNPlusOneQueries(
+            $this->nPlusOneThreshold,
+            50,
+            $period,
+            $selectedService,
+            $selectedRoute
+        );
         [$from, $to] = $this->periodBounds($period);
         $routeMetrics = $this->queries->getMetricsByRoute($from, $to, $selectedService);
         if ($selectedRoute !== null) {
@@ -266,6 +311,8 @@ final class Dashboard
             'outboundRequests',
             'requests',
             'exceptions',
+            'exceptionGroups',
+            'nPlusOne',
             'routeCards',
             'routeChartsJson',
             'chartData',
@@ -316,6 +363,43 @@ final class Dashboard
         }
 
         return ['key' => 'healthy', 'label' => 'Healthy', 'color' => '#42c98a'];
+    }
+
+    private function traceResponse(string $traceId): DashboardResponse
+    {
+        $trace = $this->queries->getTrace($traceId);
+        $assets = $this->assets();
+
+        ob_start();
+        require __DIR__ . '/resources/views/trace.php';
+        $html = (string) ob_get_clean();
+
+        return new DashboardResponse($trace === null ? 404 : 200, $html, [
+            'Content-Type' => 'text/html; charset=UTF-8',
+            'Cache-Control' => 'no-store, private',
+        ]);
+    }
+
+    /**
+     * Bundled front-end assets, inlined so the dashboard works offline and
+     * never loads third-party code from a CDN.
+     *
+     * @return array{css: string, chart: string, alpine: string}
+     */
+    private function assets(): array
+    {
+        $directory = __DIR__ . '/resources/assets/';
+        $read = static function (string $file) use ($directory): string {
+            $contents = @file_get_contents($directory . $file);
+
+            return $contents === false ? '' : $contents;
+        };
+
+        return [
+            'css' => $read('dashboard.css'),
+            'chart' => $read('chart.umd.min.js'),
+            'alpine' => $read('alpine.min.js'),
+        ];
     }
 
     private function getDenialStatus(): ?int

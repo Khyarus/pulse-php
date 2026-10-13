@@ -18,8 +18,6 @@ final class PulseMiddleware
             return $next($request);
         }
 
-        $collectRequests = (bool) config('pulse.collect_requests', true);
-        $collectExceptions = (bool) config('pulse.collect_exceptions', true);
         $pulse = app(Pulse::class);
         $matchedRoute = $request->route();
         $routeName = is_object($matchedRoute) && method_exists($matchedRoute, 'getName')
@@ -28,14 +26,19 @@ final class PulseMiddleware
         $routeUri = is_object($matchedRoute) && method_exists($matchedRoute, 'uri')
             ? $matchedRoute->uri()
             : null;
-        $routeContext = $routeName ?: $routeUri ?: '/' . ltrim($request->path(), '/');
-        $pulse->setContext(
-            (string) config('pulse.service_name', 'default'),
+        $path = '/' . ltrim($request->path(), '/');
+        $routeContext = $routeName ?: $routeUri ?: $path;
+
+        // Each request is its own trace. This also resets context between
+        // requests in long-running workers such as Octane.
+        $pulse->beginTrace(
             $routeContext,
-            $request->method()
+            $request->method(),
+            $path,
+            (string) config('pulse.service_name', 'default')
         );
 
-        if (!$collectRequests && !$collectExceptions) {
+        if (!config('pulse.collect_requests', true)) {
             return $next($request);
         }
 
@@ -45,25 +48,19 @@ final class PulseMiddleware
         try {
             $response = $next($request);
         } catch (Throwable $exception) {
-            if ($collectExceptions) {
-                $pulse->recordException($exception, true);
-            }
-            if ($collectRequests) {
-                $this->recordRequest($pulse, $request, 500, $startedAt, $memoryAtStart);
-            }
+            // Exceptions themselves are captured by the exception handler hook.
+            $this->recordRequest($pulse, $request, 500, $startedAt, $memoryAtStart);
 
             throw $exception;
         }
 
-        if ($collectRequests) {
-            $this->recordRequest(
-                $pulse,
-                $request,
-                $response->getStatusCode(),
-                $startedAt,
-                $memoryAtStart
-            );
-        }
+        $this->recordRequest(
+            $pulse,
+            $request,
+            $response->getStatusCode(),
+            $startedAt,
+            $memoryAtStart
+        );
 
         return $response;
     }
@@ -76,7 +73,8 @@ final class PulseMiddleware
         int $memoryAtStart
     ): void {
         $pulse->recordRequest(
-            $request->fullUrl(),
+            // Query strings often carry tokens or personal data; never persist them.
+            $request->url(),
             $request->method(),
             $status,
             (hrtime(true) - $startedAt) / 1_000_000,

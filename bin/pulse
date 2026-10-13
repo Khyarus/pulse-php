@@ -1,0 +1,115 @@
+#!/usr/bin/env php
+<?php
+
+declare(strict_types=1);
+
+use PulsePHP\Alerts\AlertManager;
+use PulsePHP\Storage\SQLiteStorage;
+
+foreach ([
+    __DIR__ . '/../vendor/autoload.php',        // working on the package itself
+    __DIR__ . '/../../../autoload.php',         // installed as vendor/jgcansi/pulse-php
+] as $autoload) {
+    if (is_file($autoload)) {
+        require $autoload;
+        break;
+    }
+}
+
+if (!class_exists(SQLiteStorage::class)) {
+    fwrite(STDERR, "Unable to locate the Composer autoloader.\n");
+    exit(1);
+}
+
+$usage = <<<'TXT'
+PulsePHP command line
+
+Usage:
+  pulse prune --db=PATH [--days=7] [--vacuum]
+  pulse check --db=PATH [--webhook=URL] [--format=json|slack] [--service=NAME]
+              [--window=5] [--cooldown=30] [--min-requests=20]
+              [--error-rate=5] [--exceptions=10] [--p95=2000] [--dry-run]
+
+The database path may also come from the PULSE_DB_PATH environment variable.
+Thresholds set to "off" disable that rule.
+
+TXT;
+
+$arguments = array_slice($argv, 1);
+$command = array_shift($arguments);
+$options = [];
+foreach ($arguments as $argument) {
+    if (preg_match('/^--([a-z0-9-]+)(?:=(.*))?$/', $argument, $matches) !== 1) {
+        fwrite(STDERR, "Unknown argument: {$argument}\n\n{$usage}");
+        exit(2);
+    }
+    $options[$matches[1]] = $matches[2] ?? true;
+}
+
+if ($command === null || in_array($command, ['help', '--help', '-h'], true)) {
+    fwrite(STDOUT, $usage);
+    exit(0);
+}
+
+$dbPath = (string) ($options['db'] ?? getenv('PULSE_DB_PATH') ?: '');
+if ($dbPath === '' || $dbPath === '1') {
+    fwrite(STDERR, "Missing --db=PATH (or PULSE_DB_PATH).\n");
+    exit(2);
+}
+
+$number = static function (string $name, int|float|null $default) use ($options): int|float|null {
+    if (!array_key_exists($name, $options)) {
+        return $default;
+    }
+    if ($options[$name] === 'off') {
+        return null;
+    }
+    if (!is_numeric($options[$name])) {
+        fwrite(STDERR, "--{$name} must be a number or \"off\".\n");
+        exit(2);
+    }
+
+    return $options[$name] + 0;
+};
+
+try {
+    switch ($command) {
+        case 'prune':
+            $days = (int) $number('days', 7);
+            $deleted = (new SQLiteStorage($dbPath))->prune($days, isset($options['vacuum']));
+            fwrite(STDOUT, sprintf("Pruned %d row(s) older than %d day(s).\n", array_sum($deleted), $days));
+            exit(0);
+
+        case 'check':
+            $manager = new AlertManager($dbPath, [
+                'window_minutes' => $number('window', 5),
+                'cooldown_minutes' => $number('cooldown', 30),
+                'min_requests' => $number('min-requests', 20),
+                'error_rate_percent' => $number('error-rate', 5.0),
+                'exceptions' => $number('exceptions', 10),
+                'p95_ms' => $number('p95', 2000),
+            ], (string) ($options['service'] ?? getenv('PULSE_SERVICE_NAME') ?: 'default'));
+
+            if (isset($options['dry-run'])) {
+                $alerts = $manager->evaluate();
+            } else {
+                if (is_string($options['webhook'] ?? null)) {
+                    $manager->notifyWebhook($options['webhook'], (string) ($options['format'] ?? 'json'));
+                }
+                $alerts = $manager->check();
+            }
+
+            foreach ($alerts as $alert) {
+                fwrite(STDOUT, '• ' . $alert['message'] . "\n");
+            }
+            fwrite(STDOUT, $alerts === [] ? "No alerts.\n" : '');
+            exit(0);
+
+        default:
+            fwrite(STDERR, "Unknown command: {$command}\n\n{$usage}");
+            exit(2);
+    }
+} catch (Throwable $exception) {
+    fwrite(STDERR, '[PulsePHP] ' . $exception->getMessage() . "\n");
+    exit(1);
+}

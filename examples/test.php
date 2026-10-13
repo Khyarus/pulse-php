@@ -26,7 +26,7 @@ if (!extension_loaded('pdo_sqlite')) {
 
 $dbPath = __DIR__ . '/../storage/database.sqlite';
 $runId = bin2hex(random_bytes(6));
-$_SERVER['REQUEST_URI'] = '/health-check?source=test&run=' . $runId;
+$_SERVER['REQUEST_URI'] = '/health-check/' . $runId . '?source=test';
 $_SERVER['REQUEST_METHOD'] = 'GET';
 $_SERVER['REMOTE_ADDR'] = '127.0.0.1';
 http_response_code(200);
@@ -88,7 +88,7 @@ try {
         ],
         [
             'SELECT COUNT(*) FROM pulse_requests WHERE url = ?',
-            ['/health-check?source=test&run=' . $runId],
+            ['/health-check/' . $runId],
             1,
             'test request',
         ],
@@ -121,10 +121,10 @@ try {
     $requestStatement = $pdo->prepare(
         'SELECT url, method, status_code, ip FROM pulse_requests WHERE url = ?'
     );
-    $requestStatement->execute(['/health-check?source=test&run=' . $runId]);
+    $requestStatement->execute(['/health-check/' . $runId]);
     $request = $requestStatement->fetch(PDO::FETCH_ASSOC);
     if ($request === false
-        || $request['url'] !== '/health-check?source=test&run=' . $runId
+        || $request['url'] !== '/health-check/' . $runId
         || $request['method'] !== 'GET'
         || (int) $request['status_code'] !== 200
         || $request['ip'] !== '127.0.0.1') {

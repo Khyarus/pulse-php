@@ -35,10 +35,13 @@
     },
     "require-dev": {
         "friendsofphp/php-cs-fixer": "^3.64",
-        "phpunit/phpunit": "^10.5"
+        "guzzlehttp/guzzle": "^7.5",
+        "orchestra/testbench": "^10.0",
+        "phpunit/phpunit": "^10.5 || ^11.5"
     },
     "suggest": {
-        "illuminate/support": "Required only for the optional Laravel 9+ integration."
+        "illuminate/support": "Required only for the optional Laravel 9+ integration.",
+        "guzzlehttp/guzzle": "Record outbound calls made with Guzzle through PulsePHP\\Http\\GuzzleMiddleware."
     },
     "autoload": {
         "psr-4": {
@@ -53,13 +56,13 @@
             "PulsePHP\\Tests\\": "tests/"
         }
     },
+    "bin": [
+        "bin/pulse"
+    ],
     "config": {
         "sort-packages": true,
         "optimize-autoloader": true,
-        "preferred-install": "dist",
-        "platform": {
-            "php": "8.1.0"
-        }
+        "preferred-install": "dist"
     },
     "minimum-stability": "stable",
     "prefer-stable": true,
@@ -70,7 +73,7 @@
             ]
         },
         "branch-alias": {
-            "dev-main": "1.0.x-dev"
+            "dev-main": "1.x-dev"
         }
     },
     "scripts": {
@@ -80,12 +83,13 @@
         "demo:traffic": "php examples/traffic.php",
         "check-style": "php-cs-fixer fix --dry-run --diff",
         "format": "php-cs-fixer fix",
-        "validate": "composer validate --strict",
+        "validate:strict": "composer validate --strict",
         "check": [
-            "@validate",
+            "@validate:strict",
             "@check-style",
             "@test"
-        ]
+        ],
+        "build:assets": "npm install && npm run build:css"
     },
     "scripts-descriptions": {
         "test": "Runs the PHPUnit test suite.",
@@ -94,7 +98,8 @@
         "demo:traffic": "Generates sample traffic for the dashboard (examples/traffic.php).",
         "check-style": "Checks the code style without modifying files (CI).",
         "format": "Applies code style fixes automatically.",
-        "validate": "Validates composer.json in strict mode.",
-        "check": "Runs validation, style checks and tests (recommended for local CI)."
+        "validate:strict": "Validates composer.json in strict mode.",
+        "check": "Runs validation, style checks and tests (recommended for local CI).",
+        "build:assets": "Rebuilds the dashboard stylesheet (requires Node.js)."
     }
 }

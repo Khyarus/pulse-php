@@ -15,12 +15,7 @@ $escape = static fn (mixed $value): string => htmlspecialchars(
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="color-scheme" content="dark">
     <title>PulsePHP · Observability</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script defer src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
-    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style><?= $assets['css'] ?></style>
     <style>
         :root {
             color-scheme: dark;
@@ -34,8 +29,8 @@ $escape = static fn (mixed $value): string => htmlspecialchars(
             --pulse-warning: #e7b957;
             --pulse-critical: #f16d76;
         }
-        body { font-family: 'DM Sans', sans-serif; background: var(--pulse-bg); color: var(--pulse-text); }
-        .mono { font-family: 'DM Mono', monospace; }
+        body { font-family: 'DM Sans', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif; background: var(--pulse-bg); color: var(--pulse-text); }
+        .mono { font-family: 'DM Mono', ui-monospace, 'SFMono-Regular', Menlo, Consolas, monospace; }
         .panel { border: 1px solid var(--pulse-border); border-radius: 8px; background: var(--pulse-panel); }
         .eyebrow { letter-spacing: .08em; }
         .scroll-table { scrollbar-width: thin; scrollbar-color: #42534b transparent; }
@@ -57,7 +52,7 @@ $escape = static fn (mixed $value): string => htmlspecialchars(
         :focus-visible { outline: 2px solid #65dca0; outline-offset: 2px; }
         .route-card { border-left: 3px solid var(--route-health); }
         .health-badge { color: var(--route-health); background: color-mix(in srgb, var(--route-health) 14%, transparent); }
-        .method-badge { border: 1px solid currentColor; border-radius: 4px; padding: 3px 6px; font: 500 10px 'DM Mono', monospace; }
+        .method-badge { border: 1px solid currentColor; border-radius: 4px; padding: 3px 6px; font: 500 10px ui-monospace, Menlo, Consolas, monospace; }
         .method-badge[data-method="GET"] { color: #78adff; }
         .method-badge[data-method="POST"] { color: #49cf95; }
         .method-badge[data-method="PUT"] { color: #e7b957; }
@@ -153,6 +148,7 @@ $escape = static fn (mixed $value): string => htmlspecialchars(
             <article class="panel p-4 sm:p-5">
                 <p class="text-xs font-medium text-[#68776f]">Average response</p>
                 <p class="mono mt-3 text-[27px] font-medium leading-none"><span x-text="formatFixed(liveStats.avg_response_ms, 2)"><?= $escape($averageDuration) ?></span><span class="ml-1 text-sm text-[#718078]">ms</span></p>
+                <p class="mono mt-2 text-[11px] text-[#9aa9a1]">p95 <span x-text="formatFixed(liveStats.p95_response_ms, 1)"><?= $escape(number_format($stats['p95_response_ms'], 1)) ?></span> ms · p99 <span x-text="formatFixed(liveStats.p99_response_ms, 1)"><?= $escape(number_format($stats['p99_response_ms'], 1)) ?></span> ms</p>
             </article>
             <article class="panel p-4 sm:p-5">
                 <p class="text-xs font-medium text-[#68776f]">Peak request memory</p>
@@ -186,9 +182,10 @@ $escape = static fn (mixed $value): string => htmlspecialchars(
                                 <span class="health-badge rounded px-2 py-1 text-[10px] font-semibold uppercase" x-text="card.health.label"></span>
                             </div>
                         </div>
-                        <div class="mt-4 grid grid-cols-3 gap-2">
+                        <div class="mt-4 grid grid-cols-4 gap-2">
                             <div><p class="text-[10px] uppercase text-[#89968f]">Requests</p><p class="mono mt-1 text-sm" x-text="formatNumber(card.total_requests)"></p></div>
                             <div><p class="text-[10px] uppercase text-[#89968f]">Avg</p><p class="mono mt-1 text-sm"><span x-text="formatFixed(card.avg_duration_ms, 1)"></span> ms</p></div>
+                            <div><p class="text-[10px] uppercase text-[#89968f]">p95</p><p class="mono mt-1 text-sm"><span x-text="formatFixed(card.p95_duration_ms, 1)"></span> ms</p></div>
                             <div><p class="text-[10px] uppercase text-[#89968f]">Errors</p><p class="mono mt-1 text-sm"><span x-text="formatFixed(card.error_rate_percent, 2)"></span>%</p></div>
                         </div>
                         <div class="route-sparkline mt-3"><canvas :id="'route-chart-' + card.chart_id" :aria-label="'Response time trend for ' + card.route" role="img"></canvas></div>
@@ -225,6 +222,9 @@ require __DIR__ . '/widgets/spans.php'; ?>
             <?php $widgetId = 'outbound';
 $widgetLabel = 'Outbound APIs';
 require __DIR__ . '/widgets/outbound.php'; ?>
+            <?php $widgetId = 'nplus';
+$widgetLabel = 'N+1 queries';
+require __DIR__ . '/widgets/nplus.php'; ?>
             <?php $widgetId = 'exceptions';
 $widgetLabel = 'Exceptions';
 require __DIR__ . '/widgets/exceptions.php'; ?>
@@ -233,7 +233,9 @@ require __DIR__ . '/widgets/exceptions.php'; ?>
         <footer class="pb-4 pt-5 text-center text-[11px] text-[#89968f]">PulsePHP · local telemetry</footer>
     </main>
 
+    <script><?= $assets['chart'] ?></script>
     <script>
+        const pulseDataEndpoint = <?= $dataEndpointJson ?>;
         const pulseInitialLiveData = <?= $liveDataJson ?>;
         const pulseChartData = <?= $chartsJson ?>;
         const pulseChartRegistry = { general: {}, routes: {} };
@@ -243,18 +245,21 @@ require __DIR__ . '/widgets/exceptions.php'; ?>
                 queries: 'Slow queries',
                 spans: 'Spans',
                 outbound: 'Outbound APIs',
+                nplus: 'N+1 queries',
                 exceptions: 'Exceptions'
             },
-            order: ['requests', 'queries', 'spans', 'outbound', 'exceptions'],
+            order: ['requests', 'queries', 'spans', 'outbound', 'nplus', 'exceptions'],
             settings: {
                 requests: { visible: true, collapsed: false, view: 'chart' },
                 queries: { visible: true, collapsed: false, view: 'table' },
                 spans: { visible: true, collapsed: false, view: 'table' },
                 outbound: { visible: true, collapsed: false, view: 'table' },
+                nplus: { visible: true, collapsed: false, view: 'table' },
                 exceptions: { visible: true, collapsed: false, view: 'table' }
             },
             liveStats: pulseInitialLiveData.stats,
             liveExceptions: pulseInitialLiveData.exceptions,
+            liveExceptionGroups: pulseInitialLiveData.exceptionGroups,
             routeCards: pulseInitialLiveData.routeCards,
             liveChartData: pulseInitialLiveData.chartData,
             refreshSeconds: 0,
@@ -299,6 +304,7 @@ require __DIR__ . '/widgets/exceptions.php'; ?>
             },
             formatNumber(value) { return new Intl.NumberFormat().format(Number(value) || 0); },
             formatFixed(value, digits) { return (Number(value) || 0).toFixed(digits); },
+            traceUrl(id) { const url = new URL(window.location.href); url.search = ''; url.searchParams.set('trace', id); return url.toString(); },
             isVisible(id) { return this.settings[id].visible; },
             isCollapsed(id) { return this.settings[id].collapsed; },
             currentView(id) { return this.settings[id].view; },
@@ -339,8 +345,10 @@ require __DIR__ . '/widgets/exceptions.php'; ?>
                 if (this.refreshing) return;
                 this.refreshing = true;
                 try {
-                    const endpoint = new URL('dashboard-data.php', window.location.href);
-                    endpoint.search = window.location.search;
+                    const endpoint = new URL(pulseDataEndpoint, window.location.href);
+                    for (const [key, value] of new URLSearchParams(window.location.search)) {
+                        endpoint.searchParams.set(key, value);
+                    }
                     const response = await fetch(endpoint, {
                         cache: 'no-store',
                         credentials: 'same-origin',
@@ -351,6 +359,7 @@ require __DIR__ . '/widgets/exceptions.php'; ?>
 
                     this.liveStats = snapshot.stats;
                     this.liveExceptions = snapshot.exceptions;
+                    this.liveExceptionGroups = snapshot.exceptionGroups;
                     this.liveChartData = snapshot.chartData;
                     this.lastUpdated = snapshot.generatedAt;
                     this.refreshError = false;
@@ -514,5 +523,6 @@ require __DIR__ . '/widgets/exceptions.php'; ?>
             });
         }
     </script>
+    <script><?= $assets['alpine'] ?></script>
 </body>
 </html>

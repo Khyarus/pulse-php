@@ -29,7 +29,23 @@ final class ExceptionCollector
 
         if (is_callable($this->previousExceptionHandler)) {
             ($this->previousExceptionHandler)($exception);
+
+            return;
         }
+
+        // Without a previous handler PHP's default behaviour must survive:
+        // log the uncaught exception and end with a failure status. Rethrowing
+        // from inside the handler re-enters it on some PHP versions, so the
+        // default is reproduced explicitly instead.
+        restore_exception_handler();
+        $this->pulse->flush();
+
+        if (!headers_sent() && PHP_SAPI !== 'cli') {
+            http_response_code(500);
+        }
+        error_log('PHP Fatal error:  Uncaught ' . $exception);
+
+        exit(255);
     }
 
     public function handleError(
