@@ -41,6 +41,45 @@ As versões do PulsePHP seguem o formato **`MAJOR.MINOR.PATCH`**, com um sufixo 
 
 ---
 
+## [1.0.0] - 2026-10-13
+
+Primeira versão **estável**. A API pública segue SemVer a partir daqui.
+
+### Corrigido
+- **Exceções no Laravel não eram capturadas.** O Laravel renderiza a exceção dentro do pipeline de rotas, então o middleware nunca a via. A captura agora usa o `ExceptionHandler` (`reportable`), cobre HTTP, jobs e console e respeita o `dontReport` (404, validação etc. não viram ruído).
+- **Auto-refresh do dashboard quebrado no Laravel.** O JS chamava `dashboard-data.php`, que não existe no Laravel. Nova rota `GET /pulse/data` (`pulse.data`), e a URL é configurável via `Dashboard::withDataEndpoint()`.
+- **Middleware fora do grupo `web`/`api` no Laravel 11+.** O kernel re-sincroniza os grupos e descartava o middleware adicionado só no router; agora ele é registrado pelo kernel.
+- **Vazamento de memória em workers (filas, Octane, Horizon).** O buffer só era gravado no shutdown do PHP. Agora é gravado ao fim de cada request (`terminating`, `RequestTerminated`), ao fim de cada job e sempre que atinge `max_buffer_size`.
+- **Falhas de gravação derrubavam a aplicação.** `flush()` não lança mais exceções: o lote é descartado e o erro vai para o log (`reportErrorsUsing()` no core, `Log::warning` no Laravel).
+- **Exceções não tratadas eram engolidas no modo standalone** quando não havia handler anterior: o script terminava com status 0 e sem log. Agora o erro é logado e o processo sai com status 255 (HTTP 500).
+- **O dashboard registrava as próprias requisições**, poluindo as métricas. Dashboard e endpoint de dados são sempre ignorados.
+- **Dashboard falhava antes da primeira gravação** (banco inexistente). O banco é criado e migrado ao abrir o dashboard.
+- Tabela de exceções do dashboard sem `<tbody>`.
+
+### Adicionado
+- **Retenção:** `pulse:prune` (Laravel), `vendor/bin/pulse prune` (standalone) e limpeza automática por loteria (`retention_days`, `prune_lottery`). Remove entradas órfãs do catálogo de SQL e aceita `--vacuum`.
+- **Sampling** (`sample_rate`) e **lista de caminhos ignorados** (`ignore_paths`, com `*`). Exceções e métricas explícitas são sempre gravadas.
+- **Traces:** cada request ou job recebe um `trace_id` que correlaciona request, queries, spans, chamadas externas e exceções. Nova **página de detalhe** (`?trace=<id>`).
+- **Detecção de N+1:** padrões de query repetidos dentro do mesmo trace (limite configurável em `n_plus_one_threshold`).
+- **Exceções agrupadas** por classe + arquivo + linha, com contagem, última mensagem e link para o trace. A classe da exceção agora é salva.
+- **Percentis p95/p99** de latência no resumo e p95 por rota.
+- **Alertas** por webhook (JSON genérico ou Slack) e e-mail (Laravel): taxa de 5xx, volume de exceções e p95, com janela e cooldown. `pulse:check` / `vendor/bin/pulse check`.
+- **Jobs de fila** viram traces próprios (`job:<Classe>`) com span de duração.
+- **`PulsePHP\Http\GuzzleMiddleware`** para capturar chamadas Guzzle.
+- **`PulsePHP\Database\TracedPDO`** para capturar queries em PHP puro (só o SQL normalizado; valores nunca são gravados).
+- **`php artisan pulse:install`**, que publica a config e mostra os passos restantes.
+- Novas chaves de config e variáveis de ambiente: `PULSE_DB_PATH`, `PULSE_PATH`, `PULSE_SAMPLE_RATE`, `PULSE_IGNORE_PATHS`, `PULSE_RETENTION_DAYS`, `PULSE_ALERT_*`, entre outras.
+- Testes de integração Laravel com `orchestra/testbench` e CI em PHP 8.1–8.4.
+
+### Alterado
+- **Assets do dashboard embutidos no pacote** (Chart.js 4.4.7, Alpine.js 3.14.8 e CSS do Tailwind compilado). Nenhum CDN nem Google Fonts: o dashboard funciona offline e é compatível com CSP sem domínios externos.
+- **A query string não é mais gravada** nas URLs de requisições recebidas (podia conter tokens ou dados pessoais), igual às chamadas externas.
+- `StorageInterface` ganhou `prune()`.
+- `Pulse::flush()` não relança exceções de storage.
+- Bancos existentes são migrados automaticamente (novas colunas `trace_id`, `class`, `fingerprint` e índices), sem perder dados.
+
+---
+
 ## [1.0.0-beta.1] - 2026-01-01
 
 Primeira versão **Beta** pública. As funcionalidades centrais estão completas e a API é considerada estável o suficiente para uso em testes, sujeita a ajustes até o lançamento `1.0.0` estável.
@@ -84,5 +123,6 @@ composer require jgcansi/pulse-php:^1.0@beta
 
 ---
 
-[Unreleased]: https://github.com/jgcansi/pulse-php/compare/v1.0.0-beta.1...HEAD
+[Unreleased]: https://github.com/jgcansi/pulse-php/compare/v1.0.0...HEAD
+[1.0.0]: https://github.com/jgcansi/pulse-php/compare/v1.0.0-beta.1...v1.0.0
 [1.0.0-beta.1]: https://github.com/jgcansi/pulse-php/releases/tag/v1.0.0-beta.1

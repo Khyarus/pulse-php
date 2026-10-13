@@ -48,7 +48,7 @@ assignees: []
 
 ## 🖥️ Ambiente
 
-- **Versão do PulsePHP:** <!-- ex.: 1.0.0-beta.1 (composer show jgcansi/pulse-php) -->
+- **Versão do PulsePHP:** <!-- ex.: 1.0.0 (composer show jgcansi/pulse-php) -->
 - **Versão do PHP:** <!-- ex.: 8.2.15 (php -v) -->
 - **Versão do Laravel:** <!-- ex.: 10.x — ou "N/A" se PHP puro -->
 - **Sistema operacional:** <!-- ex.: Ubuntu 24.04 / Windows 11 / macOS 14 -->
