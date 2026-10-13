@@ -19,7 +19,7 @@
 
 <!-- BADGES -->
 <p align="center">
-  <a href="https://github.com/Khyarus/pulse-php/releases"><img src="https://img.shields.io/badge/versão-1.0.1-4f5b93?style=for-the-badge" alt="Versão"></a>
+  <a href="https://github.com/Khyarus/pulse-php/releases"><img src="https://img.shields.io/badge/versão-1.1.0-4f5b93?style=for-the-badge" alt="Versão"></a>
   <a href="https://github.com/Khyarus/pulse-php/actions/workflows/tests.yml"><img src="https://img.shields.io/badge/testes-passing-2e7d5b?style=for-the-badge" alt="Testes"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/licença-MIT-2e7d5b?style=for-the-badge" alt="Licença"></a>
 </p>

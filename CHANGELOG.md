@@ -37,6 +37,13 @@ As versões do PulsePHP seguem o formato **`MAJOR.MINOR.PATCH`**, com um sufixo 
 ## [Unreleased]
 
 ### Adicionado
+- (em desenvolvimento)
+
+---
+
+## [1.1.0] - 2026-10-13
+
+### Adicionado
 - **Dashboard redesenhado em telas:** Overview, Requests, Errors (lista e detalhe), Queries, Jobs, Outbound HTTP, Logs e Storage & settings, com navegação lateral e escopo (período, serviço, rota) compartilhado.
 - **Overview com sinais vitais** (requisições, p95, taxa de 5xx, exceções) e comparação com o período anterior; gráfico de requisições e exceções sobre papel de eletrocardiograma.
 - **Trace em cascata:** spans, queries e chamadas externas posicionados no tempo (novas colunas `offset_ms`), mais exceções e logs da execução.
@@ -145,7 +152,8 @@ composer require jgcansi/pulse-php:^1.0@beta
 
 ---
 
-[Unreleased]: https://github.com/Khyarus/pulse-php/compare/v1.0.1...HEAD
+[Unreleased]: https://github.com/Khyarus/pulse-php/compare/v1.1.0...HEAD
+[1.1.0]: https://github.com/Khyarus/pulse-php/compare/v1.0.1...v1.1.0
 [1.0.1]: https://github.com/Khyarus/pulse-php/compare/v1.0.0...v1.0.1
 [1.0.0]: https://github.com/Khyarus/pulse-php/compare/v1.0.0-beta.1...v1.0.0
 [1.0.0-beta.1]: https://github.com/Khyarus/pulse-php/releases/tag/v1.0.0-beta.1
