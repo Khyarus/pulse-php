@@ -54,6 +54,7 @@ final class Dashboard
 
     private const JSON_FLAGS = JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_THROW_ON_ERROR;
     private const CSRF_COOKIE = 'pulse_csrf';
+    private const MIN_COMPARABLE_REQUESTS = 20;
 
     private ?array $basicAuth = null;
     private ?array $allowedIps = null;
@@ -601,31 +602,49 @@ final class Dashboard
     private function vitals(array $current, array $previous, string $period): array
     {
         $versus = 'vs ' . self::PREVIOUS_LABELS[$period];
-        $relative = static function (float $now, float $before, bool $higherIsWorse) use ($versus): array {
+        // Percentages against a handful of requests are noise ("+8000%"), so
+        // comparisons need a minimum amount of traffic in the previous window.
+        $comparable = $previous['requests'] >= self::MIN_COMPARABLE_REQUESTS;
+        $unavailable = $current['requests'] === 0 && $previous['requests'] === 0
+            ? 'No traffic yet'
+            : 'Not enough data for the ' . substr($versus, 3);
+
+        $relative = static function (float $now, float $before, bool $higherIsWorse) use ($versus, $comparable, $unavailable): array {
+            if (!$comparable) {
+                return [$unavailable, 'flat'];
+            }
             if ($before <= 0.0) {
-                return [$now > 0 ? 'No data for the ' . substr($versus, 3) : 'No traffic yet', 'flat'];
+                return [$now > 0 ? 'New ' . $versus : 'Steady ' . $versus, $now > 0 && $higherIsWorse ? 'worse' : 'flat'];
             }
             $change = ($now - $before) / $before * 100;
             if (abs($change) < 1) {
                 return ['Steady ' . $versus, 'flat'];
             }
             $worse = $higherIsWorse ? $change > 0 : $change < 0;
+            $label = abs($change) >= 1000
+                ? sprintf('%s %s', $change > 0 ? sprintf('%.0f× higher', $now / $before) : 'Down sharply', $versus)
+                : sprintf('%s%.0f%% %s', $change > 0 ? '+' : '−', abs($change), $versus);
 
-            return [sprintf('%s%.0f%% %s', $change > 0 ? '+' : '−', abs($change), $versus), $worse ? 'worse' : 'better'];
+            return [$label, $worse ? 'worse' : 'better'];
         };
 
         [$throughputDelta] = $relative((float) $current['requests'], (float) $previous['requests'], false);
         [$p95Delta, $p95Trend] = $relative($current['p95_ms'], $previous['p95_ms'], true);
         [$exceptionDelta, $exceptionTrend] = $relative((float) $current['exceptions'], (float) $previous['exceptions'], true);
         $pointChange = $current['error_rate_percent'] - $previous['error_rate_percent'];
-        $errorDelta = $previous['requests'] === 0
-            ? 'No data for the ' . substr($versus, 3)
-            : (abs($pointChange) < 0.05 ? 'Steady ' . $versus : sprintf('%s%.1f pts %s', $pointChange > 0 ? '+' : '−', abs($pointChange), $versus));
+        if (!$comparable) {
+            [$errorDelta, $errorTrend] = [$unavailable, 'flat'];
+        } elseif (abs($pointChange) < 0.05) {
+            [$errorDelta, $errorTrend] = ['Steady ' . $versus, 'flat'];
+        } else {
+            $errorDelta = sprintf('%s%.1f pts %s', $pointChange > 0 ? '+' : '−', abs($pointChange), $versus);
+            $errorTrend = $pointChange > 0 ? 'worse' : 'better';
+        }
 
         return [
             ['key' => 'requests', 'label' => 'Requests', 'value' => (float) $current['requests'], 'unit' => '', 'delta' => $throughputDelta, 'trend' => 'flat'],
             ['key' => 'p95', 'label' => 'p95 latency', 'value' => $current['p95_ms'], 'unit' => 'ms', 'delta' => $p95Delta, 'trend' => $p95Trend],
-            ['key' => 'error_rate', 'label' => 'Server error rate', 'value' => $current['error_rate_percent'], 'unit' => '%', 'delta' => $errorDelta, 'trend' => $previous['requests'] === 0 ? 'flat' : ($pointChange >= 0.05 ? 'worse' : ($pointChange <= -0.05 ? 'better' : 'flat'))],
+            ['key' => 'error_rate', 'label' => 'Server error rate', 'value' => $current['error_rate_percent'], 'unit' => '%', 'delta' => $errorDelta, 'trend' => $errorTrend],
             ['key' => 'exceptions', 'label' => 'Exceptions', 'value' => (float) $current['exceptions'], 'unit' => '', 'delta' => $exceptionDelta, 'trend' => $exceptionTrend],
         ];
     }

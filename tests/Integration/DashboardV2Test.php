@@ -181,16 +181,29 @@ final class DashboardV2Test extends TestCase
     {
         $storage = new SQLiteStorage($this->dbPath);
         $request = ['url' => '/', 'method' => 'GET', 'status_code' => 200, 'duration_ms' => 10.0, 'memory_bytes' => 0, 'ip' => null];
-        $storage->writeBatch(['requests' => array_fill(0, 4, $request)]);
+        $storage->writeBatch(['requests' => array_fill(0, 5, $request)]);
         $pdo = new PDO('sqlite:' . $this->dbPath);
         $pdo->exec("UPDATE pulse_requests SET created_at = datetime('now', '-90 minutes')");
-        $storage->writeBatch(['requests' => array_fill(0, 6, $request)]);
+        $storage->writeBatch(['requests' => array_fill(0, 30, $request)]);
 
-        $snapshot = json_decode($this->dashboard()->handleJson()->body, true);
-        $vitals = array_column($snapshot['vitals'], null, 'key');
+        $vitals = $this->vitals();
+        self::assertSame(30.0, (float) $vitals['requests']['value']);
+        self::assertSame('Not enough data for the previous hour', $vitals['requests']['delta'], 'Five requests are too few to compare.');
 
-        self::assertSame(6.0, (float) $vitals['requests']['value']);
+        $storage->writeBatch(['requests' => array_fill(0, 15, $request)]);
+        $pdo->exec("UPDATE pulse_requests SET created_at = datetime('now', '-90 minutes') WHERE id <= 20");
+
+        $vitals = $this->vitals();
+        self::assertSame(30.0, (float) $vitals['requests']['value']);
         self::assertSame('+50% vs previous hour', $vitals['requests']['delta']);
+    }
+
+    /** @return array<string, array<string, mixed>> */
+    private function vitals(): array
+    {
+        $snapshot = json_decode($this->dashboard()->handleJson()->body, true);
+
+        return array_column($snapshot['vitals'], null, 'key');
     }
 
     /** @return array<string, mixed> */

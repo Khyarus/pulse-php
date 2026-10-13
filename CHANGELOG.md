@@ -49,7 +49,9 @@ As versões do PulsePHP seguem o formato **`MAJOR.MINOR.PATCH`**, com um sufixo 
 ### Alterado
 - O CSS do Tailwind e a etapa de build em Node foram substituídos por um CSS próprio. Fontes IBM Plex embutidas; assets servidos via `?asset=` com cache longo em vez de inline em cada página.
 - O endpoint JSON ao vivo agora devolve `vitals` e um `chartData` no formato `{labels, requests, exceptions, deploys}`.
-- O gerador de tráfego de exemplo mede tempos reais, simula um N+1, grava logs e marca um deploy.
+- O gerador de tráfego de exemplo mede tempos reais, simula um N+1 e jobs de fila, grava logs e marca um deploy.
+- Comparações com o período anterior só aparecem quando ele teve ao menos 20 requisições, evitando variações sem sentido como "+8000%".
+- Banner, ilustrações e prints do README refeitos no novo tema.
 
 ---
 

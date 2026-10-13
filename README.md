@@ -19,9 +19,9 @@
 
 <!-- BADGES -->
 <p align="center">
-  <a href="https://github.com/Khyarus/pulse-php/releases"><img src="https://img.shields.io/badge/versão-1.0.1-3aa0ff?style=for-the-badge" alt="Versão"></a>
-  <a href="https://github.com/Khyarus/pulse-php/actions/workflows/tests.yml"><img src="https://img.shields.io/badge/testes-passing-42c98a?style=for-the-badge" alt="Testes"></a>
-  <a href="LICENSE"><img src="https://img.shields.io/badge/licença-MIT-42c98a?style=for-the-badge" alt="Licença"></a>
+  <a href="https://github.com/Khyarus/pulse-php/releases"><img src="https://img.shields.io/badge/versão-1.0.1-4f5b93?style=for-the-badge" alt="Versão"></a>
+  <a href="https://github.com/Khyarus/pulse-php/actions/workflows/tests.yml"><img src="https://img.shields.io/badge/testes-passing-2e7d5b?style=for-the-badge" alt="Testes"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/licença-MIT-2e7d5b?style=for-the-badge" alt="Licença"></a>
 </p>
 
 <p align="center">
@@ -29,14 +29,14 @@
   <img src="https://img.shields.io/badge/Laravel-9%2B-FF2D20?style=flat-square&logo=laravel&logoColor=white" alt="Laravel">
   <img src="https://img.shields.io/badge/SQLite-003B57?style=flat-square&logo=sqlite&logoColor=white" alt="SQLite">
   <img src="https://img.shields.io/badge/Composer-885630?style=flat-square&logo=composer&logoColor=white" alt="Composer">
-  <img src="https://img.shields.io/badge/PHPUnit-3aa0ff?style=flat-square&logo=phpunit&logoColor=white" alt="PHPUnit">
+  <img src="https://img.shields.io/badge/PHPUnit-4f5b93?style=flat-square&logo=phpunit&logoColor=white" alt="PHPUnit">
 </p>
 
 <p align="center">
-  <a href="#-demonstração-em-ação"><img src="https://img.shields.io/badge/▶_Ver_Demo-42c98a?style=for-the-badge" alt="Ver demo"></a>
-    <a href="#-instalação"><img src="https://img.shields.io/badge/⚙_Instalação-3aa0ff?style=for-the-badge" alt="Instalação"></a>
-  <a href="#-uso"><img src="https://img.shields.io/badge/📚_Documentação-555?style=for-the-badge" alt="Documentação"></a>
-  <a href="https://github.com/Khyarus/pulse-php/discussions"><img src="https://img.shields.io/badge/💬_Discussões-5865F2?style=for-the-badge" alt="Discussões"></a>
+  <a href="#-demonstração-em-ação"><img src="https://img.shields.io/badge/▶_Ver_Demo-c8102e?style=for-the-badge" alt="Ver demo"></a>
+    <a href="#-instalação"><img src="https://img.shields.io/badge/⚙_Instalação-4f5b93?style=for-the-badge" alt="Instalação"></a>
+  <a href="#-uso"><img src="https://img.shields.io/badge/📚_Documentação-565068?style=for-the-badge" alt="Documentação"></a>
+  <a href="https://github.com/Khyarus/pulse-php/discussions"><img src="https://img.shields.io/badge/💬_Discussões-221d33?style=for-the-badge" alt="Discussões"></a>
 </p>
 
 <p align="center">
@@ -55,34 +55,56 @@
 
 ### Overview
 
-Sinais vitais do período com comparação contra o período anterior, gráfico de requisições e exceções com marcadores de deploy, rotas que precisam de atenção e erros abertos. Tema claro (papel de eletrocardiograma) e escuro, seguindo o sistema ou escolhido no botão de tema.
+Sinais vitais do período comparados com o período anterior, gráfico de requisições e exceções sobre papel de eletrocardiograma com marcadores de deploy, rotas que precisam de atenção e erros abertos. O tema segue o sistema ou é escolhido no botão do topo.
 
-<p align="center">
-  <img src="./docs/overview-dark.jpg" alt="Overview do PulsePHP no tema escuro" width="90%">
-</p>
+<table>
+  <tr>
+    <td width="50%"><img src="./docs/overview-light.jpg" alt="Overview no tema claro" width="100%"></td>
+    <td width="50%"><img src="./docs/overview-dark.jpg" alt="Overview no tema escuro" width="100%"></td>
+  </tr>
+  <tr>
+    <td align="center"><sub>Tema claro</sub></td>
+    <td align="center"><sub>Tema escuro</sub></td>
+  </tr>
+</table>
 
 ### Trace de uma requisição
 
-Cada requisição ou job vira um trace: spans, queries e chamadas externas numa linha do tempo, além das exceções e logs daquela execução. No print abaixo, o padrão N+1 (a mesma query repetida em sequência) aparece a olho nu.
+Cada requisição ou job vira um trace: spans, queries e chamadas externas posicionados na linha do tempo, mais as exceções e os logs daquela execução. No print, o N+1 (a mesma query em sequência) aparece a olho nu.
 
 <p align="center">
   <img src="./docs/trace.jpg" alt="Linha do tempo de uma requisição com spans, queries e chamadas HTTP" width="90%">
 </p>
 
-### Telas
+### Erros
 
-| Tela | O que mostra |
-| --- | --- |
-| **Overview** | Requisições, p95, taxa de erro 5xx e exceções, com variação vs. período anterior; gráfico com deploys; rotas críticas; erros abertos. |
-| **Requests** | Todas as requisições, com busca por URL/rota, filtro por status, método e duração mínima, e paginação. |
-| **Errors** | Exceções agrupadas por classe e local. Marque como resolvida ou ignorada; se voltar a acontecer, reaparece como *regressed*. |
-| **Queries** | Queries mais lentas por formato e detecção de N+1. |
-| **Jobs** | Jobs de fila por classe: execuções, falhas, média, p95 e pior caso. |
-| **Outbound HTTP** | Chamadas externas agrupadas por host, com falhas e latência. |
-| **Logs** | Logs ligados à requisição ou job que os escreveu. |
-| **Storage & settings** | Tamanho do banco, linhas por tabela, retenção e deploys marcados. |
+Exceções agrupadas por classe e local. Marque como resolvida ou ignorada; se voltar a acontecer depois de resolvida, reaparece como *regressed*. O detalhe mostra a frequência, as rotas afetadas, os eventos recentes (cada um abre o trace) e o stack trace.
 
-Use **Ctrl+K** (ou `/`) para pular para qualquer tela, rota, serviço ou erro.
+<table>
+  <tr>
+    <td width="50%"><img src="./docs/errors.jpg" alt="Lista de erros agrupados" width="100%"></td>
+    <td width="50%"><img src="./docs/error-detail.jpg" alt="Detalhe de um grupo de erro" width="100%"></td>
+  </tr>
+</table>
+
+### Requests, queries e jobs
+
+<table>
+  <tr>
+    <td width="50%"><img src="./docs/requests.jpg" alt="Lista de requisições com filtros" width="100%"><br><sub><b>Requests</b>: busca por URL ou rota, filtros por status, método e duração mínima.</sub></td>
+    <td width="50%"><img src="./docs/queries.jpg" alt="Queries lentas e N+1" width="100%"><br><sub><b>Queries</b>: N+1 e queries mais lentas, agrupadas por formato.</sub></td>
+  </tr>
+  <tr>
+    <td width="50%"><img src="./docs/jobs.jpg" alt="Jobs de fila por classe" width="100%"><br><sub><b>Jobs</b>: execuções, falhas, média, p95 e pior caso por classe.</sub></td>
+    <td width="50%"><img src="./docs/outbound.jpg" alt="Chamadas HTTP externas por host" width="100%"><br><sub><b>Outbound HTTP</b>: chamadas externas por destino, com falhas e latência.</sub></td>
+  </tr>
+  <tr>
+    <td width="50%"><img src="./docs/logs.jpg" alt="Logs ligados às requisições" width="100%"><br><sub><b>Logs</b>: cada linha ligada à requisição ou job que a escreveu.</sub></td>
+    <td width="50%"><img src="./docs/search.jpg" alt="Busca rápida com Ctrl+K" width="100%"><br><sub><b>Ctrl+K</b>: pula para qualquer tela, rota, serviço ou erro.</sub></td>
+  </tr>
+</table>
+
+A tela **Storage & settings** mostra o tamanho do banco, as linhas por tabela, a retenção e os deploys marcados.
 
 <p align="center">
   <img src="./docs/terminal.svg" alt="Instalação e execução do PulsePHP no terminal" width="90%">
@@ -142,7 +164,7 @@ Use **Ctrl+K** (ou `/`) para pular para qualquer tela, rota, serviço ou erro.
   <img src="https://img.shields.io/badge/Laravel-FF2D20?style=for-the-badge&logo=laravel&logoColor=white" alt="Laravel">
   <img src="https://img.shields.io/badge/SQLite-003B57?style=for-the-badge&logo=sqlite&logoColor=white" alt="SQLite">
   <img src="https://img.shields.io/badge/Composer-885630?style=for-the-badge&logo=composer&logoColor=white" alt="Composer">
-  <img src="https://img.shields.io/badge/PHPUnit-3aa0ff?style=for-the-badge&logo=phpunit&logoColor=white" alt="PHPUnit">
+  <img src="https://img.shields.io/badge/PHPUnit-4f5b93?style=for-the-badge&logo=phpunit&logoColor=white" alt="PHPUnit">
 </p>
 
 ---

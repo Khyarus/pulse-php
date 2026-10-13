@@ -3,7 +3,7 @@
     'use strict';
 
     const cssVar = (name) => getComputedStyle(document.documentElement).getPropertyValue(name).trim();
-    const numberFormat = new Intl.NumberFormat();
+    const numberFormat = new Intl.NumberFormat('en');
 
     function parseUtc(value) {
         if (!value) return null;
@@ -123,7 +123,8 @@
             ctx.fillStyle = cssVar('--php');
             ctx.font = '500 11px "Plex Sans", sans-serif';
             ctx.setLineDash([4, 3]);
-            markers.forEach((marker) => {
+            let lastLabelEnd = -Infinity;
+            markers.slice().reverse().forEach((marker) => {
                 let index = labels.indexOf(marker.bucket);
                 if (index === -1) index = labels.findIndex((label) => label > marker.bucket);
                 if (index === -1) return;
@@ -132,7 +133,13 @@
                 ctx.moveTo(x, chartArea.top + 14);
                 ctx.lineTo(x, chartArea.bottom);
                 ctx.stroke();
-                ctx.fillText(marker.version, x + 4, chartArea.top + 10);
+                // Deploys close together share one label slot; the line still marks each.
+                const width = ctx.measureText(marker.version).width;
+                const labelX = x + 4 + width > chartArea.right ? x - 4 - width : x + 4;
+                if (labelX > lastLabelEnd) {
+                    ctx.fillText(marker.version, labelX, chartArea.top + 10);
+                    lastLabelEnd = labelX + width + 4;
+                }
             });
             ctx.restore();
         },
@@ -316,8 +323,9 @@
             const datasets = [
                 { label: 'Requests', data: data.requests, borderColor: cssVar('--trace'), backgroundColor: cssVar('--trace'),
                   borderWidth: 2, pointRadius: 0, pointHoverRadius: 4, tension: 0, fill: false, yAxisID: 'y', order: 0,
-                  // The newest bucket is still filling up; draw it dashed so it doesn't read as a drop.
-                  segment: { borderDash: (context) => context.p1DataIndex === data.labels.length - 1 ? [4, 4] : undefined } },
+                  // The first and last buckets only cover part of their interval; draw them dashed
+                  // so they don't read as a drop in traffic.
+                  segment: { borderDash: (context) => context.p0DataIndex === 0 || context.p1DataIndex === data.labels.length - 1 ? [4, 4] : undefined } },
                 { label: 'Exceptions', data: data.exceptions, type: 'bar', backgroundColor: cssVar('--php') + '8c',
                   borderRadius: 1, maxBarThickness: 8, yAxisID: 'y1', order: 1 },
             ];

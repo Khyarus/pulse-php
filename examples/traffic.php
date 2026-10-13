@@ -140,6 +140,29 @@ while (true) {
         "status" => (string) $statusCode,
     ]);
 
+    $pulse->writeBuffer();
+
+    // Simulated queue job after some requests (populates "Jobs").
+    if (random_int(1, 100) <= 35) {
+        $jobs = [
+            "App\\Jobs\\SendInvoiceEmail" => [40, 260],
+            "App\\Jobs\\SyncInventory" => [120, 900],
+            "App\\Jobs\\GenerateMonthlyReport" => [400, 1600],
+        ];
+        $job = array_rand($jobs);
+        $jobName = "job:" . $job;
+        $pulse->beginTrace($jobName, "JOB", $jobName, $service);
+        $pulse->startTimer($jobName);
+        foreach (range(1, random_int(1, 3)) as $_) {
+            $nominal = random_int(...$jobs[$job]);
+            $pulse->recordQuery($queryTemplates[array_rand($queryTemplates)], $timed(static fn () => $work(intdiv($nominal, 3))));
+        }
+        if (random_int(1, 100) <= 8) {
+            $pulse->recordException(new RuntimeException("Job failed: SMTP connection refused"), true);
+        }
+        $pulse->endTimer($jobName);
+    }
+
     $pulse->flush();
     $statusLabel = $statusCode >= 500
         ? $colorize($statusCode . " ERROR", "31;1")

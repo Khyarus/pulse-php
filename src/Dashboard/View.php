@@ -104,6 +104,11 @@ final class View
         return number_format((float) $value);
     }
 
+    public function plural(int $count, string $singular, string $plural): string
+    {
+        return number_format($count) . ' ' . ($count === 1 ? $singular : $plural);
+    }
+
     public function bytes(int $bytes): string
     {
         $units = ['B', 'KB', 'MB', 'GB'];

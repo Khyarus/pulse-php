@@ -28,8 +28,8 @@ $kinds = ['request' => 'Request', 'span' => 'Span', 'query' => 'Query', 'http' =
 
     <section class="panel">
         <dl class="facts" style="border-top: 0">
-            <div class="fact"><dt>Database</dt><dd><?= $this->e($this->ms($queryMs)) ?> <span class="small muted"><?= $this->e(count($trace['queries'])) ?> queries</span></dd></div>
-            <div class="fact"><dt>Outbound HTTP</dt><dd><?= $this->e($this->ms($outboundMs)) ?> <span class="small muted"><?= $this->e(count($trace['outbound'])) ?> calls</span></dd></div>
+            <div class="fact"><dt>Database</dt><dd><?= $this->e($this->ms($queryMs)) ?> <span class="small muted"><?= $this->e($this->plural(count($trace['queries']), 'query', 'queries')) ?></span></dd></div>
+            <div class="fact"><dt>Outbound HTTP</dt><dd><?= $this->e($this->ms($outboundMs)) ?> <span class="small muted"><?= $this->e($this->plural(count($trace['outbound']), 'call', 'calls')) ?></span></dd></div>
             <div class="fact"><dt>Exceptions</dt><dd><?= $this->e(count($trace['exceptions'])) ?></dd></div>
             <?php if ($request !== null): ?><div class="fact"><dt>Peak memory</dt><dd><?= $this->e($this->bytes((int) $request['memory_bytes'])) ?></dd></div><?php endif; ?>
         </dl>
