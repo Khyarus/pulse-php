@@ -34,6 +34,10 @@ return [
     'collect_exceptions' => env('PULSE_COLLECT_EXCEPTIONS', true),
     'collect_outbound_requests' => env('PULSE_COLLECT_OUTBOUND', true),
     'collect_jobs' => env('PULSE_COLLECT_JOBS', true),
+    'collect_logs' => env('PULSE_COLLECT_LOGS', true),
+
+    // Lowest log level stored (debug, info, notice, warning, error, critical…).
+    'log_level' => env('PULSE_LOG_LEVEL', 'warning'),
 
     // Fraction (0.0–1.0) of requests and jobs recorded. Exceptions are always kept.
     'sample_rate' => (float) env('PULSE_SAMPLE_RATE', 1.0),

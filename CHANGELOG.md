@@ -37,7 +37,19 @@ As versões do PulsePHP seguem o formato **`MAJOR.MINOR.PATCH`**, com um sufixo 
 ## [Unreleased]
 
 ### Adicionado
-- (em desenvolvimento)
+- **Dashboard redesenhado em telas:** Overview, Requests, Errors (lista e detalhe), Queries, Jobs, Outbound HTTP, Logs e Storage & settings, com navegação lateral e escopo (período, serviço, rota) compartilhado.
+- **Overview com sinais vitais** (requisições, p95, taxa de 5xx, exceções) e comparação com o período anterior; gráfico de requisições e exceções sobre papel de eletrocardiograma.
+- **Trace em cascata:** spans, queries e chamadas externas posicionados no tempo (novas colunas `offset_ms`), mais exceções e logs da execução.
+- **Ciclo de vida dos erros:** resolver, ignorar e reabrir pelo dashboard; um erro resolvido que volta a acontecer aparece como *regressed*. Formulários com proteção CSRF (token do Laravel ou cookie próprio no modo standalone).
+- **Logs:** `Pulse::recordLog()`, `PulsePHP\Logging\PulseLogHandler` (Monolog 3) e captura automática no Laravel a partir de `PULSE_LOG_LEVEL` (padrão `warning`).
+- **Marcadores de deploy:** `Pulse::deploy()`, `php artisan pulse:deploy` e `vendor/bin/pulse deploy`, desenhados nos gráficos.
+- **Busca Ctrl+K** por telas, rotas, serviços e erros; **tema claro e escuro** (segue o sistema ou escolha manual); horários exibidos no fuso do navegador.
+- `Dashboard::withRequest()` para frameworks passarem a requisição explicitamente (necessário no Octane e em testes, onde as superglobais não são preenchidas). O controller do Laravel já usa.
+
+### Alterado
+- O CSS do Tailwind e a etapa de build em Node foram substituídos por um CSS próprio. Fontes IBM Plex embutidas; assets servidos via `?asset=` com cache longo em vez de inline em cada página.
+- O endpoint JSON ao vivo agora devolve `vitals` e um `chartData` no formato `{labels, requests, exceptions, deploys}`.
+- O gerador de tráfego de exemplo mede tempos reais, simula um N+1, grava logs e marca um deploy.
 
 ---
 

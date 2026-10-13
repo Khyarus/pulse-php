@@ -19,5 +19,3 @@
 /.env.example            export-ignore
 /.gitattributes          export-ignore
 /.gitignore              export-ignore
-/resources               export-ignore
-/package.json            export-ignore

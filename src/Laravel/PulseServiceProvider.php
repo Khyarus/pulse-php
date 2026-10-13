@@ -10,6 +10,7 @@ use Illuminate\Database\Events\QueryExecuted;
 use Illuminate\Http\Client\Events\ConnectionFailed;
 use Illuminate\Http\Client\Events\RequestSending;
 use Illuminate\Http\Client\Events\ResponseReceived;
+use Illuminate\Log\Events\MessageLogged;
 use Illuminate\Queue\Events\JobExceptionOccurred;
 use Illuminate\Queue\Events\JobFailed;
 use Illuminate\Queue\Events\JobProcessed;
@@ -21,6 +22,7 @@ use Illuminate\Support\Facades\Route;
 use Illuminate\Support\ServiceProvider;
 use PulsePHP\Laravel\Collectors\OutboundHttpCollector;
 use PulsePHP\Laravel\Console\CheckCommand;
+use PulsePHP\Laravel\Console\DeployCommand;
 use PulsePHP\Laravel\Console\InstallCommand;
 use PulsePHP\Laravel\Console\PruneCommand;
 use PulsePHP\Laravel\Http\Controllers\DashboardController;
@@ -62,7 +64,7 @@ final class PulseServiceProvider extends ServiceProvider
         $this->publishes([$configPath => config_path('pulse.php')], 'pulse-config');
 
         if ($this->app->runningInConsole()) {
-            $this->commands([PruneCommand::class, CheckCommand::class, InstallCommand::class]);
+            $this->commands([PruneCommand::class, CheckCommand::class, InstallCommand::class, DeployCommand::class]);
         }
 
         $config = $this->app['config'];
@@ -97,6 +99,10 @@ final class PulseServiceProvider extends ServiceProvider
 
         if ($config->get('pulse.collect_jobs', true)) {
             $this->registerQueueHooks();
+        }
+
+        if ($config->get('pulse.collect_logs', true)) {
+            $this->registerLogListener((string) $config->get('pulse.log_level', 'warning'));
         }
 
         // Long-running runtimes never reach PHP shutdown between units of
@@ -146,6 +152,7 @@ final class PulseServiceProvider extends ServiceProvider
 
         Route::middleware($middleware)->group(function () use ($path): void {
             Route::get($path, [DashboardController::class, 'show'])->name('pulse.dashboard');
+            Route::post($path, [DashboardController::class, 'show'])->name('pulse.action');
             Route::get($path . '/data', [DashboardController::class, 'data'])->name('pulse.data');
         });
     }
@@ -190,6 +197,32 @@ final class PulseServiceProvider extends ServiceProvider
         Event::listen(JobProcessed::class, $finish);
         Event::listen(JobFailed::class, $finish);
         Event::listen(JobExceptionOccurred::class, $finish);
+    }
+
+    /**
+     * Stores log lines at or above $minimumLevel. Lines that carry an
+     * exception are skipped: the exception itself is already recorded.
+     */
+    private function registerLogListener(string $minimumLevel): void
+    {
+        $levels = ['debug', 'info', 'notice', 'warning', 'error', 'critical', 'alert', 'emergency'];
+        $threshold = array_search(strtolower($minimumLevel), $levels, true);
+        $threshold = $threshold === false ? 3 : $threshold;
+
+        Event::listen(MessageLogged::class, function (MessageLogged $event) use ($levels, $threshold): void {
+            $level = array_search(strtolower($event->level), $levels, true);
+            if ($level === false || $level < $threshold
+                || ($event->context['exception'] ?? null) instanceof Throwable
+                || str_starts_with((string) $event->message, '[PulsePHP]')) {
+                return;
+            }
+
+            try {
+                $this->app->make(Pulse::class)->recordLog($event->level, (string) $event->message, $event->context);
+            } catch (Throwable) {
+                // Logging must never fail because of telemetry.
+            }
+        });
     }
 
     /** @return list<string> */

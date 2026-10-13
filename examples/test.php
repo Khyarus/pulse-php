@@ -148,7 +148,7 @@ try {
 
     unset($_SERVER['PHP_AUTH_USER'], $_SERVER['PHP_AUTH_PW'], $_SERVER['HTTP_AUTHORIZATION']);
     $deniedHtml = $assertDashboardStatus(new Dashboard($dbPath), 403);
-    if (!str_contains($deniedHtml, 'Access denied') || str_contains($deniedHtml, 'Application pulse')) {
+    if (!str_contains($deniedHtml, 'Access denied') || str_contains($deniedHtml, 'Overview — PulsePHP')) {
         throw new RuntimeException('Dashboard should deny access when no policy is configured.');
     }
 
@@ -187,7 +187,7 @@ try {
         ->authWithIp(['127.0.0.1', '::1'])
         ->authorize(static fn (): bool => true);
     $authorizedHtml = $assertDashboardStatus($authorizedDashboard, 200);
-    if (!str_contains($authorizedHtml, 'Application pulse')) {
+    if (!str_contains($authorizedHtml, 'Overview — PulsePHP')) {
         throw new RuntimeException('Dashboard should render when every authorization policy passes.');
     }
 

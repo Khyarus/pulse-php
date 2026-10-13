@@ -16,6 +16,7 @@ CREATE TABLE IF NOT EXISTS pulse_spans (
     service TEXT NOT NULL DEFAULT 'default',
     route TEXT NOT NULL DEFAULT '/',
     trace_id TEXT NOT NULL DEFAULT '',
+    offset_ms REAL,
     created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
@@ -63,6 +64,7 @@ CREATE TABLE IF NOT EXISTS pulse_queries (
     service TEXT NOT NULL DEFAULT 'default',
     route TEXT NOT NULL DEFAULT '/',
     trace_id TEXT NOT NULL DEFAULT '',
+    offset_ms REAL,
     created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (catalog_id) REFERENCES pulse_catalog(id)
 );
@@ -76,6 +78,7 @@ CREATE TABLE IF NOT EXISTS pulse_outbound_requests (
     url TEXT NOT NULL,
     duration_ms REAL NOT NULL,
     trace_id TEXT NOT NULL DEFAULT '',
+    offset_ms REAL,
     created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
@@ -119,3 +122,32 @@ CREATE INDEX IF NOT EXISTS idx_pulse_outbound_trace_id ON pulse_outbound_request
 -- Exception grouping.
 CREATE INDEX IF NOT EXISTS idx_pulse_exceptions_fingerprint_created_at
     ON pulse_exceptions(fingerprint, created_at);
+
+CREATE TABLE IF NOT EXISTS pulse_exception_states (
+    fingerprint TEXT PRIMARY KEY,
+    status TEXT NOT NULL,
+    updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS pulse_deploys (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    version TEXT NOT NULL,
+    service TEXT NOT NULL DEFAULT 'default',
+    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS pulse_logs (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    level TEXT NOT NULL,
+    message TEXT NOT NULL,
+    context TEXT NOT NULL DEFAULT '{}',
+    service TEXT NOT NULL DEFAULT 'default',
+    route TEXT NOT NULL DEFAULT '/',
+    trace_id TEXT NOT NULL DEFAULT '',
+    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_pulse_deploys_created_at ON pulse_deploys(created_at);
+CREATE INDEX IF NOT EXISTS idx_pulse_logs_created_at ON pulse_logs(created_at);
+CREATE INDEX IF NOT EXISTS idx_pulse_logs_trace_id ON pulse_logs(trace_id);
+CREATE INDEX IF NOT EXISTS idx_pulse_logs_service_route_created_at ON pulse_logs(service, route, created_at);

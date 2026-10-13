@@ -70,69 +70,75 @@ $colorize = static function (string $text, string $color) use ($useColors): stri
 };
 $iteration = 0;
 
+$pulse->deploy("demo-" . gmdate("Hi"));
 fwrite(STDOUT, "PulsePHP traffic generator started. Press Ctrl+C to stop.\n");
 
 while (true) {
     [$service, $method, $route] = $routes[array_rand($routes)];
-    $durationMs = random_int(40, 1200);
-    $statusCode = $route === "/api/v1/checkout" && random_int(1, 100) <= 13 ? 500 : 200;
     // Each simulated request is its own trace, like a real web request.
     $pulse->beginTrace($route, $method, $route, $service);
-    usleep($durationMs * 1000);
-    $pulse->recordRequest(
-        $route,
-        $method,
-        $statusCode,
-        (float) $durationMs,
-        memory_get_usage(true),
-        "127.0.0.1"
-    );
-    $pulse->recordMetric("simulator.request", 1.0, [
-        "method" => $method,
-        "status" => (string) $statusCode,
-    ]);
+    $startedAt = hrtime(true);
+    // Simulated work sleeps for a quarter of its nominal time to keep the demo fast.
+    $work = static fn (int $nominalMs) => usleep(max(1, intdiv($nominalMs * 1000, 4)));
+    $timed = static function (callable $operation): float {
+        $start = hrtime(true);
+        $operation();
 
-    // Simulated database queries (populates "Slow query patterns").
-    $queryCount = random_int(2, 5);
-    for ($i = 0; $i < $queryCount; $i++) {
-        $template = $queryTemplates[array_rand($queryTemplates)];
-        $queryMs = random_int(1, 100) <= 25
-            ? random_int(300, 1800)
-            : random_int(2, 120);
-        $pulse->recordQuery($template, (float) $queryMs);
-    }
+        return (hrtime(true) - $start) / 1_000_000;
+    };
 
     // Simulated in-app spans (populates "Slow spans").
     $spanCount = random_int(1, 3);
     for ($i = 0; $i < $spanCount; $i++) {
         $span = $spanTemplates[array_rand($spanTemplates)];
         $pulse->startTimer($span);
-        $spanMs = random_int(10, 100) <= 30
-            ? random_int(200, 1500)
-            : random_int(5, 150);
-        usleep($spanMs * 1000);
+        $work(random_int(10, 100) <= 20 ? random_int(200, 900) : random_int(5, 120));
         $pulse->endTimer($span);
     }
 
-    // Simulated outbound API calls (populates "Outbound API calls").
-    $outboundCount = random_int(1, 2);
+    // Simulated database queries; one route has an N+1 loop.
+    $queryCount = $route === "/api/v1/orders" ? random_int(6, 12) : random_int(2, 5);
+    for ($i = 0; $i < $queryCount; $i++) {
+        $template = $route === "/api/v1/orders" && $i > 0
+            ? "SELECT * FROM order_items WHERE order_id = " . random_int(1, 9999)
+            : $queryTemplates[array_rand($queryTemplates)];
+        $nominal = random_int(1, 100) <= 15 ? random_int(250, 1200) : random_int(2, 80);
+        $pulse->recordQuery($template, $timed(static fn () => $work($nominal)));
+    }
+
+    // Simulated outbound API calls (populates "Outbound HTTP").
+    $outboundCount = random_int(0, 2);
     for ($i = 0; $i < $outboundCount; $i++) {
         $url = $outboundTemplates[array_rand($outboundTemplates)];
         $outboundMethod = random_int(1, 100) <= 60 ? "GET" : "POST";
-        $outboundStatus = random_int(1, 100) <= 20 ? random_int(400, 503) : 200;
-        $outboundMs = random_int(50, 100) <= 35 ? random_int(250, 2000) : random_int(30, 250);
-        $pulse->recordOutboundRequest($url, $outboundMethod, $outboundStatus, (float) $outboundMs);
+        $outboundStatus = random_int(1, 100) <= 10 ? random_int(500, 503) : 200;
+        $nominal = random_int(1, 100) <= 25 ? random_int(250, 1500) : random_int(30, 250);
+        $pulse->recordOutboundRequest($url, $outboundMethod, $outboundStatus, $timed(static fn () => $work($nominal)));
     }
 
-    // Simulated exceptions (populates "Recent exceptions").
+    // Simulated failures (populates "Errors" and "Logs").
+    $statusCode = $route === "/api/v1/checkout" && random_int(1, 100) <= 13 ? 500 : 200;
     $hasException = false;
     $exceptionClass = "";
-    if ($statusCode >= 500 || random_int(1, 100) <= 40) {
+    if ($statusCode >= 500 || random_int(1, 100) <= 6) {
         $exceptionClass = array_rand($exceptionTemplates);
         $exceptionMessage = sprintf($exceptionTemplates[$exceptionClass], $method . " " . $route);
         $pulse->recordException(new RuntimeException($exceptionMessage), $statusCode >= 500);
+        $pulse->recordLog("error", "Request failed: " . $exceptionMessage, ["route" => $route]);
         $hasException = true;
     }
+
+    $durationMs = (int) round((hrtime(true) - $startedAt) / 1_000_000);
+    if ($durationMs > 400) {
+        $pulse->recordLog("warning", sprintf("Slow request: %s %s took %d ms", $method, $route, $durationMs), [
+            "threshold_ms" => 400,
+        ]);
+    }
+    $pulse->recordRequest($route, $method, $statusCode, (float) $durationMs, memory_get_usage(true), "127.0.0.1");
+    $pulse->recordMetric("simulator.request", 1.0, [
+        "method" => $method,
+        "status" => (string) $statusCode,
+    ]);
 
     $pulse->flush();
     $statusLabel = $statusCode >= 500

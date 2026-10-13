@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace PulsePHP\Laravel\Http\Controllers;
 
+use Illuminate\Http\Request;
 use Illuminate\Http\Response;
 use Illuminate\Routing\Controller;
 use Illuminate\Support\Facades\Gate;
@@ -12,20 +13,29 @@ use PulsePHP\Dashboard\DashboardResponse;
 
 final class DashboardController extends Controller
 {
-    public function show(): Response
+    public function show(Request $request): Response
     {
-        return $this->toResponse($this->dashboard()->handle());
+        return $this->toResponse($this->dashboard($request)->handle());
     }
 
-    public function data(): Response
+    public function data(Request $request): Response
     {
-        return $this->toResponse($this->dashboard()->handleJson());
+        return $this->toResponse($this->dashboard($request)->handleJson());
     }
 
-    private function dashboard(): Dashboard
+    private function dashboard(Request $request): Dashboard
     {
         $dashboard = (new Dashboard((string) config('pulse.database_path')))
+            ->withRequest(
+                $request->query->all(),
+                $request->request->all(),
+                $request->cookies->all(),
+                $request->method(),
+                (string) $request->ip()
+            )
             ->withDataEndpoint(route('pulse.data', [], false))
+            // Laravel's VerifyCsrfToken middleware checks the token on POST.
+            ->withFormToken('_token', (string) csrf_token())
             ->withNPlusOneThreshold((int) config('pulse.n_plus_one_threshold', 5));
         $dashboard->authorize(static fn (): bool => Gate::allows('viewPulse'));
 

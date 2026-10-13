@@ -41,57 +41,48 @@
 
 <p align="center">
   <a href="#-demonstração-em-ação">
-    <img src="./docs/dashboard-graficos.png" alt="Dashboard do PulsePHP rodando com gráficos ao vivo" width="100%">
+    <img src="./docs/overview-light.jpg" alt="Overview do PulsePHP: sinais vitais e gráfico de requisições sobre papel de eletrocardiograma" width="100%">
   </a>
   <br/>
-  <sub>Dashboard do PulsePHP rodando localmente — <a href="#-demonstração-em-ação">veja mais prints ↓</a></sub>
+  <sub>Overview do PulsePHP rodando localmente — <a href="#-demonstração-em-ação">veja mais prints ↓</a></sub>
 </p>
 
 ---
 
 ## 🎬 Demonstração em Ação
 
-> Prints reais do dashboard rodando: navegação, filtros por período/serviço/rota, gráficos, widgets e detecção de erros em tempo real.
+> Prints reais do dashboard com o tráfego de exemplo (`php examples/traffic.php`).
 
-### 📊 Visão geral e gráficos
+### Overview
 
-<p align="center">
-  <img src="./docs/dashboard-graficos.png" alt="Dashboard do PulsePHP com gráficos de throughput e latência" width="90%">
-  <br/>
-  <sub>Gráficos ao vivo de requisições, latência e throughput por serviço e rota.</sub>
-</p>
-
-### 🧩 Widgets e atividade
+Sinais vitais do período com comparação contra o período anterior, gráfico de requisições e exceções com marcadores de deploy, rotas que precisam de atenção e erros abertos. Tema claro (papel de eletrocardiograma) e escuro, seguindo o sistema ou escolhido no botão de tema.
 
 <p align="center">
-  <img src="./docs/widgets.png" alt="Widgets do dashboard: slow queries, slow spans e chamadas externas" width="90%">
-  <br/>
-  <sub>Widgets: slow query patterns, slow spans e outbound API calls.</sub>
+  <img src="./docs/overview-dark.jpg" alt="Overview do PulsePHP no tema escuro" width="90%">
 </p>
+
+### Trace de uma requisição
+
+Cada requisição ou job vira um trace: spans, queries e chamadas externas numa linha do tempo, além das exceções e logs daquela execução. No print abaixo, o padrão N+1 (a mesma query repetida em sequência) aparece a olho nu.
 
 <p align="center">
-  <img src="./docs/atividade-lista.png" alt="Lista de atividade com requisições recentes" width="90%">
-  <br/>
-  <sub>Lista de atividade — requisições recentes com método, status e duração.</sub>
+  <img src="./docs/trace.jpg" alt="Linha do tempo de uma requisição com spans, queries e chamadas HTTP" width="90%">
 </p>
 
-### 🩺 Saúde por rota
+### Telas
 
-<p align="center">
-  <img src="./docs/saude-rota.png" alt="Cartão de saúde de uma rota saudável" width="48%">
-  &nbsp;
-  <img src="./docs/saude-rota-warning.png" alt="Cartão de saúde de uma rota com aviso" width="48%">
-  <br/>
-  <sub>Cartões de saúde por rota — estado saudável (esquerda) e estado de atenção (direita).</sub>
-</p>
+| Tela | O que mostra |
+| --- | --- |
+| **Overview** | Requisições, p95, taxa de erro 5xx e exceções, com variação vs. período anterior; gráfico com deploys; rotas críticas; erros abertos. |
+| **Requests** | Todas as requisições, com busca por URL/rota, filtro por status, método e duração mínima, e paginação. |
+| **Errors** | Exceções agrupadas por classe e local. Marque como resolvida ou ignorada; se voltar a acontecer, reaparece como *regressed*. |
+| **Queries** | Queries mais lentas por formato e detecção de N+1. |
+| **Jobs** | Jobs de fila por classe: execuções, falhas, média, p95 e pior caso. |
+| **Outbound HTTP** | Chamadas externas agrupadas por host, com falhas e latência. |
+| **Logs** | Logs ligados à requisição ou job que os escreveu. |
+| **Storage & settings** | Tamanho do banco, linhas por tabela, retenção e deploys marcados. |
 
-### 🚨 Erros e exceções
-
-<p align="center">
-  <img src="./docs/erros.png" alt="Painel de erros e exceções do PulsePHP" width="90%">
-  <br/>
-  <sub>Painel de erros — exceções recentes com classe, rota e serviço.</sub>
-</p>
+Use **Ctrl+K** (ou `/`) para pular para qualquer tela, rota, serviço ou erro.
 
 <p align="center">
   <img src="./docs/terminal.svg" alt="Instalação e execução do PulsePHP no terminal" width="90%">
@@ -109,12 +100,6 @@
 - ⚡ **Leve** — buffer em memória com gravação em lote, sem overhead por request.
 - 🧩 **Integrável** — funciona standalone em PHP puro ou plugado no Laravel 9+.
 - 🔐 **Seguro** — dashboard negado por padrão (Basic Auth + IPs + Gate).
-
-<p align="center">
-  <img src="./docs/dashboard-graficos.png" alt="Visão geral do PulsePHP no dashboard" width="90%">
-  <br/>
-  <sub>Tudo em um único SQLite: requisições, latência, queries, spans e chamadas externas.</sub>
-</p>
 
 ---
 
@@ -134,25 +119,11 @@
 - [x] Captura de chamadas do cliente `Http` do Laravel e do **Guzzle**; queries em PHP puro via **`TracedPDO`**.
 - [x] **Retenção** configurável, **sampling** e lista de caminhos ignorados.
 - [x] **Alertas** por webhook (JSON/Slack) e e-mail.
-- [x] Dashboard ao vivo com filtros por período, serviço e rota — assets embutidos, sem CDN.
+- [x] Dashboard com 8 telas, busca Ctrl+K, tema claro/escuro e atualização ao vivo — assets e fontes embutidos, sem CDN.
+- [x] **Erros com ciclo de vida** (aberto, resolvido, ignorado, regressão), **logs** correlacionados e **marcadores de deploy**.
 - [x] Segurança por padrão: dashboard negado até configurar uma política de acesso.
 - [x] Integração opcional com Laravel 9+ via auto-discovery.
 - [x] Dados sempre locais — nada sai da sua máquina (exceto os alertas que você configurar).
-
-<table>
-  <tr>
-    <td width="50%" align="center">
-      <img src="./docs/widgets.png" alt="Widgets de slow queries, slow spans e chamadas externas" width="100%">
-      <br/>
-      <sub><b>Widgets</b> — slow queries, spans e chamadas externas.</sub>
-    </td>
-    <td width="50%" align="center">
-      <img src="./docs/saude-rota-warning.png" alt="Saúde por rota com estado de atenção" width="100%">
-      <br/>
-      <sub><b>Saúde por rota</b> — detecção de degradação.</sub>
-    </td>
-  </tr>
-</table>
 
 ---
 
@@ -163,7 +134,7 @@
 | **Core** | PHP 8.1+ | Núcleo standalone, sem dependência de framework. |
 | **Integração** | Laravel 9+ | Service provider com auto-discovery (opcional). |
 | **Dados** | SQLite (`pdo_sqlite`) | Armazenamento local em arquivo único. |
-| **Dashboard** | HTML + Alpine.js + Chart.js | Filtros, gráficos, sparklines e auto-refresh; assets embutidos no pacote. |
+| **Dashboard** | PHP templates + Alpine.js + Chart.js | Telas renderizadas no servidor, CSS próprio e fontes IBM Plex embutidas; nenhum CDN. |
 | **Testes** | PHPUnit + Testbench | Suíte automatizada em PHP 8.1 a 8.4, incluindo integração com Laravel. |
 
 <p align="center">
@@ -258,13 +229,7 @@ php examples/traffic.php --iterations=10
 
 > O script grava cada request imediatamente em `storage/database.sqlite`.
 
-Com o tráfego rodando, o dashboard ganha vida em segundos — incluindo a detecção de erros:
-
-<p align="center">
-  <img src="./docs/erros.png" alt="Painel de erros e exceções do PulsePHP" width="85%">
-  <br/>
-  <sub>Exceções recentes com classe, rota e serviço, capturadas automaticamente.</sub>
-</p>
+Com o tráfego rodando, o dashboard ganha vida em segundos: o script também marca um deploy, grava logs de requisições lentas e simula um N+1 na rota `/api/v1/orders`.
 
 ### Como instrumentar sua aplicação
 
@@ -305,6 +270,23 @@ $pulse = Pulse::getInstance();
 $pulse->beginTrace('job:enviar-email', 'JOB');
 // ... trabalho ...
 $pulse->writeBuffer();
+```
+
+**Logs** — grave linhas ligadas ao trace atual, ou plugue o handler no Monolog 3:
+
+```php
+Pulse::getInstance()->recordLog('warning', 'Estoque baixo', ['sku' => 'A-1']);
+
+use Monolog\Level;
+use PulsePHP\Logging\PulseLogHandler;
+
+$logger->pushHandler(new PulseLogHandler(Level::Warning));
+```
+
+**Deploys** — marque cada release; ela aparece como uma linha vertical nos gráficos:
+
+```bash
+vendor/bin/pulse deploy --db=storage/pulse.sqlite --version=v1.4.0
 ```
 
 ### Retenção e alertas (CLI)
@@ -391,6 +373,13 @@ Alertas usam `PULSE_ALERT_WEBHOOK` (JSON ou Slack) e/ou `PULSE_ALERT_MAIL_TO` (m
 - **Queries** via `DB::listen`, correlacionadas ao request ou job.
 - **Jobs de fila** viram traces próprios (`job:App\Jobs\...`) com span de duração.
 - O buffer é gravado ao fim de cada request e de cada job, então **Octane, Horizon e `queue:work`** não acumulam memória.
+- **Logs** a partir de `warning` (ajustável em `PULSE_LOG_LEVEL`), ligados ao request ou job. Logs que carregam uma exceção são pulados, porque a exceção já é registrada.
+
+Marque deploys no seu script de deploy para vê-los nos gráficos:
+
+```bash
+php artisan pulse:deploy "$(git rev-parse --short HEAD)"
+```
 
 As chamadas feitas com `Illuminate\Support\Facades\Http` aparecem como span `http.outbound:{host}` **e** na tabela de chamadas externas, com método, status e duração. Credenciais e query string são **removidas** da URL persistida por segurança:
 
@@ -424,6 +413,8 @@ As rotas web e API recebem contexto com o nome da rota resolvida ou seu URI. O s
 | `pulse.collect_queries` | `true` | Captura de consultas SQL. |
 | `pulse.collect_outbound_requests` | `true` | Captura de chamadas HTTP externas (cliente `Http` do Laravel). |
 | `pulse.collect_jobs` | `true` | Traces e spans para jobs de fila. |
+| `pulse.collect_logs` | `true` | Grava logs do Laravel (`PULSE_COLLECT_LOGS`). |
+| `pulse.log_level` | `warning` | Nível mínimo de log gravado (`PULSE_LOG_LEVEL`). |
 | `pulse.sample_rate` | `1.0` | Fração de requisições/jobs gravados (`PULSE_SAMPLE_RATE`). Exceções sempre são gravadas. |
 | `pulse.ignore_paths` | `/up,/health,...` | Caminhos nunca gravados, `*` é curinga (`PULSE_IGNORE_PATHS`). O dashboard é sempre ignorado. |
 | `pulse.max_buffer_size` | `1000` | Registros em memória que forçam uma gravação antecipada. |
@@ -443,16 +434,12 @@ vendor/bin/phpunit
 
 A suíte roda no GitHub Actions em **PHP 8.1 a 8.4**. Os testes de integração com Laravel (`--testsuite Laravel`) usam `orchestra/testbench` e rodam a partir do PHP 8.2.
 
-Para alterar classes CSS do dashboard, recompile o stylesheet embutido (requer Node.js):
-
-```bash
-composer build:assets
-```
+O dashboard não tem etapa de build: o CSS e o JS ficam em `src/Dashboard/resources/assets/` e são servidos pelo próprio PHP com cache.
 
 ```text
-...........................................................  59 / 59 (100%)
+......................................................................  70 / 70 (100%)
 
-OK (59 tests, 321 assertions)
+OK (70 tests, 420 assertions)
 ```
 
 ---
