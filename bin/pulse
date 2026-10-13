@@ -26,6 +26,7 @@ PulsePHP command line
 
 Usage:
   pulse prune --db=PATH [--days=7] [--vacuum]
+  pulse deploy --db=PATH --version=NAME [--service=NAME]
   pulse check --db=PATH [--webhook=URL] [--format=json|slack] [--service=NAME]
               [--window=5] [--cooldown=30] [--min-requests=20]
               [--error-rate=5] [--exceptions=10] [--p95=2000] [--dry-run]
@@ -78,6 +79,21 @@ try {
             $days = (int) $number('days', 7);
             $deleted = (new SQLiteStorage($dbPath))->prune($days, isset($options['vacuum']));
             fwrite(STDOUT, sprintf("Pruned %d row(s) older than %d day(s).\n", array_sum($deleted), $days));
+            exit(0);
+
+        case 'deploy':
+            $version = $options['version'] ?? null;
+            if (!is_string($version) || trim($version) === '') {
+                fwrite(STDERR, "Missing --version=NAME.
+");
+                exit(2);
+            }
+            (new SQLiteStorage($dbPath))->writeBatch(['deploys' => [[
+                'version' => trim($version),
+                'service' => (string) ($options['service'] ?? getenv('PULSE_SERVICE_NAME') ?: 'default'),
+            ]]]);
+            fwrite(STDOUT, sprintf("Marked deploy %s.
+", trim($version)));
             exit(0);
 
         case 'check':

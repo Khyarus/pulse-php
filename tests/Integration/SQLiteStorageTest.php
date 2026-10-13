@@ -29,6 +29,9 @@ final class SQLiteStorageTest extends TestCase
             'pulse_queries',
             'pulse_outbound_requests',
             'pulse_alert_state',
+            'pulse_exception_states',
+            'pulse_deploys',
+            'pulse_logs',
         ], $tables);
 
         $storage->writeBatch([

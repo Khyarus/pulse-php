@@ -1,35 +1,41 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="900" height="340" viewBox="0 0 900 340" role="img" aria-label="Instalação e execução do PulsePHP no terminal">
+<svg xmlns="http://www.w3.org/2000/svg" width="900" height="360" viewBox="0 0 900 360" role="img" aria-label="Instalação e execução do PulsePHP no terminal">
   <defs>
     <style>
-      .mono { font-family: 'Cascadia Code', Consolas, 'Courier New', monospace; }
+      .mono { font-family: 'IBM Plex Mono', 'Cascadia Code', Consolas, 'Courier New', monospace; }
+      .sans { font-family: 'IBM Plex Sans', 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; }
     </style>
+    <clipPath id="window"><rect x="1" y="1" width="898" height="358" rx="12"/></clipPath>
   </defs>
 
-  <rect width="900" height="340" rx="12" fill="#0d1512" stroke="#2a3631" stroke-width="1.5"/>
-  <path d="M0 36 H900" stroke="#2a3631" stroke-width="1.5"/>
-  <rect x="0" y="0" width="900" height="36" rx="12" fill="#111a16"/>
-  <rect x="0" y="24" width="900" height="12" fill="#111a16"/>
+  <g clip-path="url(#window)">
+    <rect width="900" height="360" fill="#17162a"/>
+    <rect width="900" height="38" fill="#1f1d36"/>
+    <path d="M0 38H900" stroke="#2e2b48" stroke-width="1"/>
+  </g>
+  <rect x="1" y="1" width="898" height="358" rx="12" fill="none" stroke="#2e2b48" stroke-width="2"/>
 
-  <circle cx="22" cy="18" r="6" fill="#f16d76"/>
-  <circle cx="42" cy="18" r="6" fill="#e7b957"/>
-  <circle cx="62" cy="18" r="6" fill="#42c98a"/>
-  <text x="450" y="23" class="mono" font-size="12" fill="#718078" text-anchor="middle">~/meu-projeto — bash</text>
+  <circle cx="24" cy="19" r="6" fill="#3d3959"/>
+  <circle cx="44" cy="19" r="6" fill="#3d3959"/>
+  <circle cx="64" cy="19" r="6" fill="#3d3959"/>
+  <text x="450" y="24" class="sans" font-size="12.5" fill="#837d9d" text-anchor="middle">meu-projeto</text>
 
-  <g class="mono" font-size="15">
-    <text x="28" y="72" fill="#42c98a">➜</text>
-    <text x="48" y="72" fill="#e8f0eb">composer require jgcansi/pulse-php</text>
+  <g class="mono" font-size="14.5">
+    <text x="28" y="76" fill="#ff5c70">$</text>
+    <text x="46" y="76" fill="#eeeaf6">composer require jgcansi/pulse-php</text>
+    <text x="28" y="100" fill="#837d9d">  - Installing jgcansi/pulse-php (1.1.0)</text>
 
-    <text x="28" y="104" fill="#52645a">Using version ^1.0 for jgcansi/pulse-php</text>
-    <text x="28" y="126" fill="#52645a">  - Installing jgcansi/pulse-php (1.0.1)</text>
-    <text x="28" y="148" fill="#42c98a">Package installed successfully.</text>
+    <text x="28" y="138" fill="#ff5c70">$</text>
+    <text x="46" y="138" fill="#eeeaf6">php artisan pulse:install</text>
+    <text x="28" y="162" fill="#5cc79a">PulsePHP installed. Remaining steps:</text>
 
-    <text x="28" y="192" fill="#42c98a">➜</text>
-    <text x="48" y="192" fill="#e8f0eb">php -S 127.0.0.1:8000 -t public</text>
-    <text x="28" y="220" fill="#52645a">[Wed] PHP 8.3 development server started</text>
-    <text x="28" y="242" fill="#52645a">Listening on http://127.0.0.1:8000</text>
+    <text x="28" y="200" fill="#ff5c70">$</text>
+    <text x="46" y="200" fill="#eeeaf6">php artisan pulse:deploy v1.4.0</text>
+    <text x="28" y="224" fill="#5cc79a">Marked deploy v1.4.0.</text>
 
-    <text x="28" y="286" fill="#42c98a">➜</text>
-    <text x="48" y="286" fill="#e8f0eb">php examples/traffic.php --iterations=8</text>
-    <text x="28" y="314" fill="#8ff0bf">[12:11:56] POST /api/v1/payments - 602ms (200 OK) [gateway-pagamento]</text>
+    <text x="28" y="262" fill="#ff5c70">$</text>
+    <text x="46" y="262" fill="#eeeaf6">php examples/traffic.php --iterations=3</text>
+    <text x="28" y="286" fill="#b6b0cc">[16:41:02] GET /api/v1/orders - 412ms (200 OK) [api-vendas] queries=9 spans=2 outbound=1</text>
+    <text x="28" y="310" fill="#b6b0cc">[16:41:04] POST /api/v1/checkout - 233ms <tspan fill="#ff5c70">(500 ERROR)</tspan> [api-vendas] queries=3 spans=1 outbound=0</text>
+    <text x="28" y="334" fill="#b6b0cc">[16:41:05] GET /api/v1/profile - 118ms (200 OK) [auth-service] queries=2 spans=1 outbound=1</text>
   </g>
 </svg>

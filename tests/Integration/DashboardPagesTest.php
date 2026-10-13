@@ -46,8 +46,29 @@ final class DashboardPagesTest extends TestCase
         self::assertStringNotContainsString('cdn.tailwindcss.com', $html);
         self::assertStringNotContainsString('cdn.jsdelivr.net', $html);
         self::assertStringNotContainsString('fonts.googleapis.com', $html);
-        self::assertStringContainsString('Chart.js v4', $html);
-        self::assertStringContainsString('Possible N+1 queries', $html);
+        self::assertMatchesRegularExpression('/src="\?asset=chart\.js&amp;v=[a-f0-9]{12}"/', $html);
+
+        $_GET = ['asset' => 'chart.js'];
+        $chart = $this->dashboard()->handle();
+        self::assertSame(200, $chart->status);
+        self::assertStringContainsString('Chart.js v4', $chart->body);
+        self::assertStringStartsWith('text/javascript', $chart->headers()['Content-Type']);
+
+        $_GET = ['asset' => 'fonts/plex-sans-400.woff2'];
+        self::assertSame('font/woff2', $this->dashboard()->handle()->headers()['Content-Type']);
+
+        $_GET = ['asset' => '../../Dashboard.php'];
+        self::assertSame(404, $this->dashboard()->handle()->status, 'Only bundled assets are served.');
+    }
+
+    public function test_every_screen_renders(): void
+    {
+        foreach (['requests', 'errors', 'queries', 'jobs', 'outbound', 'logs', 'settings'] as $view) {
+            $_GET = ['view' => $view];
+            $response = $this->dashboard()->handle();
+            self::assertSame(200, $response->status, $view);
+            self::assertStringContainsString('aria-current="page"', $response->body, $view);
+        }
     }
 
     public function test_the_live_refresh_endpoint_is_configurable(): void
@@ -92,10 +113,10 @@ final class DashboardPagesTest extends TestCase
         $_GET = ['trace' => '0000000000000000'];
         self::assertSame(404, $this->dashboard()->handle()->status);
 
-        $_GET = ['trace' => '<script>'];
+        $_GET = ['trace' => '<img src=x onerror=alert(1)>'];
         $invalid = $this->dashboard()->handle();
         self::assertSame(404, $invalid->status);
-        self::assertStringNotContainsString('<script>', $invalid->body);
+        self::assertStringNotContainsString('<img src=x', $invalid->body);
     }
 
     public function test_a_trace_page_still_requires_authorization(): void

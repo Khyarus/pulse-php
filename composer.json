@@ -41,7 +41,8 @@
     },
     "suggest": {
         "illuminate/support": "Required only for the optional Laravel 9+ integration.",
-        "guzzlehttp/guzzle": "Record outbound calls made with Guzzle through PulsePHP\\Http\\GuzzleMiddleware."
+        "guzzlehttp/guzzle": "Record outbound calls made with Guzzle through PulsePHP\\Http\\GuzzleMiddleware.",
+        "monolog/monolog": "Store Monolog 3 records through PulsePHP\\Logging\\PulseLogHandler."
     },
     "autoload": {
         "psr-4": {
@@ -88,8 +89,7 @@
             "@validate:strict",
             "@check-style",
             "@test"
-        ],
-        "build:assets": "npm install && npm run build:css"
+        ]
     },
     "scripts-descriptions": {
         "test": "Runs the PHPUnit test suite.",
@@ -99,7 +99,6 @@
         "check-style": "Checks the code style without modifying files (CI).",
         "format": "Applies code style fixes automatically.",
         "validate:strict": "Validates composer.json in strict mode.",
-        "check": "Runs validation, style checks and tests (recommended for local CI).",
-        "build:assets": "Rebuilds the dashboard stylesheet (requires Node.js)."
+        "check": "Runs validation, style checks and tests (recommended for local CI)."
     }
 }

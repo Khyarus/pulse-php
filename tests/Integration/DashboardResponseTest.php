@@ -45,7 +45,7 @@ final class DashboardResponseTest extends TestCase
         self::assertSame('', $leaked, 'handle() must not echo the response body');
         self::assertSame(200, $response->status);
         self::assertTrue($response->isSuccessful());
-        self::assertStringContainsString('Application pulse', $response->body);
+        self::assertStringContainsString('Overview — PulsePHP', $response->body);
         self::assertSame('text/html; charset=UTF-8', $response->headers()['Content-Type']);
         self::assertSame('no-store, private', $response->headers()['Cache-Control']);
     }

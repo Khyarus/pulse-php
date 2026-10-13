@@ -38,7 +38,7 @@ final class DashboardAuthTest extends TestCase
 
         self::assertSame(403, $status);
         self::assertStringContainsString('Access denied', $html);
-        self::assertStringNotContainsString('Application pulse', $html);
+        self::assertStringNotContainsString('Overview — PulsePHP', $html);
     }
 
     public function test_it_requires_valid_basic_auth_credentials(): void
@@ -75,7 +75,7 @@ final class DashboardAuthTest extends TestCase
             (new Dashboard($this->dbPath))->authorize(static fn (): bool => true)
         );
         self::assertSame(200, $allowedStatus);
-        self::assertStringContainsString('Application pulse', $html);
+        self::assertStringContainsString('Overview — PulsePHP', $html);
     }
 
     public function test_it_filters_dashboard_data_by_service_and_route(): void
@@ -125,16 +125,22 @@ final class DashboardAuthTest extends TestCase
         self::assertStringContainsString('value="24h" selected', $html);
         self::assertStringContainsString('value="orders-api" selected', $html);
         self::assertStringContainsString('value="orders.show" selected', $html);
-        self::assertStringContainsString('Rotas &amp; APIs Monitoradas', $html);
+        self::assertStringContainsString('Routes that need attention', $html);
         self::assertStringContainsString(':data-severity="card.health.key"', $html);
         self::assertStringContainsString('"key":"healthy"', $html);
         self::assertStringContainsString('"key":"critical"', $html);
         self::assertStringContainsString(':data-method="card.method"', $html);
         self::assertStringContainsString('"unhandled_exceptions":1', $html);
-        self::assertStringContainsString('/orders/42', $html);
-        self::assertStringNotContainsString('/catalog/search', $html);
-        self::assertStringContainsString('pulse-dashboard-v2', $html);
+        self::assertStringNotContainsString('catalog.search', substr($html, strpos($html, 'const pulseInitialLiveData')));
         self::assertStringContainsString('data-sortable', $html);
+
+        $_GET['view'] = 'requests';
+        [$requestsStatus, $requestsHtml] = $this->render(
+            (new Dashboard($this->dbPath))->authorize(static fn (): bool => true)
+        );
+        self::assertSame(200, $requestsStatus);
+        self::assertStringContainsString('/orders/42', $requestsHtml);
+        self::assertStringNotContainsString('/catalog/search', $requestsHtml);
     }
 
     public function test_it_marks_a_route_warning_at_the_latency_threshold(): void

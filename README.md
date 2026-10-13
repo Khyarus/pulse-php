@@ -19,9 +19,9 @@
 
 <!-- BADGES -->
 <p align="center">
-  <a href="https://github.com/Khyarus/pulse-php/releases"><img src="https://img.shields.io/badge/versão-1.0.1-3aa0ff?style=for-the-badge" alt="Versão"></a>
-  <a href="https://github.com/Khyarus/pulse-php/actions/workflows/tests.yml"><img src="https://img.shields.io/badge/testes-passing-42c98a?style=for-the-badge" alt="Testes"></a>
-  <a href="LICENSE"><img src="https://img.shields.io/badge/licença-MIT-42c98a?style=for-the-badge" alt="Licença"></a>
+  <a href="https://github.com/Khyarus/pulse-php/releases"><img src="https://img.shields.io/badge/versão-1.1.0-4f5b93?style=for-the-badge" alt="Versão"></a>
+  <a href="https://github.com/Khyarus/pulse-php/actions/workflows/tests.yml"><img src="https://img.shields.io/badge/testes-passing-2e7d5b?style=for-the-badge" alt="Testes"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/licença-MIT-2e7d5b?style=for-the-badge" alt="Licença"></a>
 </p>
 
 <p align="center">
@@ -29,69 +29,82 @@
   <img src="https://img.shields.io/badge/Laravel-9%2B-FF2D20?style=flat-square&logo=laravel&logoColor=white" alt="Laravel">
   <img src="https://img.shields.io/badge/SQLite-003B57?style=flat-square&logo=sqlite&logoColor=white" alt="SQLite">
   <img src="https://img.shields.io/badge/Composer-885630?style=flat-square&logo=composer&logoColor=white" alt="Composer">
-  <img src="https://img.shields.io/badge/PHPUnit-3aa0ff?style=flat-square&logo=phpunit&logoColor=white" alt="PHPUnit">
+  <img src="https://img.shields.io/badge/PHPUnit-4f5b93?style=flat-square&logo=phpunit&logoColor=white" alt="PHPUnit">
 </p>
 
 <p align="center">
-  <a href="#-demonstração-em-ação"><img src="https://img.shields.io/badge/▶_Ver_Demo-42c98a?style=for-the-badge" alt="Ver demo"></a>
-    <a href="#-instalação"><img src="https://img.shields.io/badge/⚙_Instalação-3aa0ff?style=for-the-badge" alt="Instalação"></a>
-  <a href="#-uso"><img src="https://img.shields.io/badge/📚_Documentação-555?style=for-the-badge" alt="Documentação"></a>
-  <a href="https://github.com/Khyarus/pulse-php/discussions"><img src="https://img.shields.io/badge/💬_Discussões-5865F2?style=for-the-badge" alt="Discussões"></a>
+  <a href="#-demonstração-em-ação"><img src="https://img.shields.io/badge/▶_Ver_Demo-c8102e?style=for-the-badge" alt="Ver demo"></a>
+    <a href="#-instalação"><img src="https://img.shields.io/badge/⚙_Instalação-4f5b93?style=for-the-badge" alt="Instalação"></a>
+  <a href="#-uso"><img src="https://img.shields.io/badge/📚_Documentação-565068?style=for-the-badge" alt="Documentação"></a>
+  <a href="https://github.com/Khyarus/pulse-php/discussions"><img src="https://img.shields.io/badge/💬_Discussões-221d33?style=for-the-badge" alt="Discussões"></a>
 </p>
 
 <p align="center">
   <a href="#-demonstração-em-ação">
-    <img src="./docs/dashboard-graficos.png" alt="Dashboard do PulsePHP rodando com gráficos ao vivo" width="100%">
+    <img src="./docs/overview-light.jpg" alt="Overview do PulsePHP: sinais vitais e gráfico de requisições sobre papel de eletrocardiograma" width="100%">
   </a>
   <br/>
-  <sub>Dashboard do PulsePHP rodando localmente — <a href="#-demonstração-em-ação">veja mais prints ↓</a></sub>
+  <sub>Overview do PulsePHP rodando localmente — <a href="#-demonstração-em-ação">veja mais prints ↓</a></sub>
 </p>
 
 ---
 
 ## 🎬 Demonstração em Ação
 
-> Prints reais do dashboard rodando: navegação, filtros por período/serviço/rota, gráficos, widgets e detecção de erros em tempo real.
+> Prints reais do dashboard com o tráfego de exemplo (`php examples/traffic.php`).
 
-### 📊 Visão geral e gráficos
+### Overview
 
-<p align="center">
-  <img src="./docs/dashboard-graficos.png" alt="Dashboard do PulsePHP com gráficos de throughput e latência" width="90%">
-  <br/>
-  <sub>Gráficos ao vivo de requisições, latência e throughput por serviço e rota.</sub>
-</p>
+Sinais vitais do período comparados com o período anterior, gráfico de requisições e exceções sobre papel de eletrocardiograma com marcadores de deploy, rotas que precisam de atenção e erros abertos. O tema segue o sistema ou é escolhido no botão do topo.
 
-### 🧩 Widgets e atividade
+<table>
+  <tr>
+    <td width="50%"><img src="./docs/overview-light.jpg" alt="Overview no tema claro" width="100%"></td>
+    <td width="50%"><img src="./docs/overview-dark.jpg" alt="Overview no tema escuro" width="100%"></td>
+  </tr>
+  <tr>
+    <td align="center"><sub>Tema claro</sub></td>
+    <td align="center"><sub>Tema escuro</sub></td>
+  </tr>
+</table>
 
-<p align="center">
-  <img src="./docs/widgets.png" alt="Widgets do dashboard: slow queries, slow spans e chamadas externas" width="90%">
-  <br/>
-  <sub>Widgets: slow query patterns, slow spans e outbound API calls.</sub>
-</p>
+### Trace de uma requisição
 
-<p align="center">
-  <img src="./docs/atividade-lista.png" alt="Lista de atividade com requisições recentes" width="90%">
-  <br/>
-  <sub>Lista de atividade — requisições recentes com método, status e duração.</sub>
-</p>
-
-### 🩺 Saúde por rota
+Cada requisição ou job vira um trace: spans, queries e chamadas externas posicionados na linha do tempo, mais as exceções e os logs daquela execução. No print, o N+1 (a mesma query em sequência) aparece a olho nu.
 
 <p align="center">
-  <img src="./docs/saude-rota.png" alt="Cartão de saúde de uma rota saudável" width="48%">
-  &nbsp;
-  <img src="./docs/saude-rota-warning.png" alt="Cartão de saúde de uma rota com aviso" width="48%">
-  <br/>
-  <sub>Cartões de saúde por rota — estado saudável (esquerda) e estado de atenção (direita).</sub>
+  <img src="./docs/trace.jpg" alt="Linha do tempo de uma requisição com spans, queries e chamadas HTTP" width="90%">
 </p>
 
-### 🚨 Erros e exceções
+### Erros
 
-<p align="center">
-  <img src="./docs/erros.png" alt="Painel de erros e exceções do PulsePHP" width="90%">
-  <br/>
-  <sub>Painel de erros — exceções recentes com classe, rota e serviço.</sub>
-</p>
+Exceções agrupadas por classe e local. Marque como resolvida ou ignorada; se voltar a acontecer depois de resolvida, reaparece como *regressed*. O detalhe mostra a frequência, as rotas afetadas, os eventos recentes (cada um abre o trace) e o stack trace.
+
+<table>
+  <tr>
+    <td width="50%"><img src="./docs/errors.jpg" alt="Lista de erros agrupados" width="100%"></td>
+    <td width="50%"><img src="./docs/error-detail.jpg" alt="Detalhe de um grupo de erro" width="100%"></td>
+  </tr>
+</table>
+
+### Requests, queries e jobs
+
+<table>
+  <tr>
+    <td width="50%"><img src="./docs/requests.jpg" alt="Lista de requisições com filtros" width="100%"><br><sub><b>Requests</b>: busca por URL ou rota, filtros por status, método e duração mínima.</sub></td>
+    <td width="50%"><img src="./docs/queries.jpg" alt="Queries lentas e N+1" width="100%"><br><sub><b>Queries</b>: N+1 e queries mais lentas, agrupadas por formato.</sub></td>
+  </tr>
+  <tr>
+    <td width="50%"><img src="./docs/jobs.jpg" alt="Jobs de fila por classe" width="100%"><br><sub><b>Jobs</b>: execuções, falhas, média, p95 e pior caso por classe.</sub></td>
+    <td width="50%"><img src="./docs/outbound.jpg" alt="Chamadas HTTP externas por host" width="100%"><br><sub><b>Outbound HTTP</b>: chamadas externas por destino, com falhas e latência.</sub></td>
+  </tr>
+  <tr>
+    <td width="50%"><img src="./docs/logs.jpg" alt="Logs ligados às requisições" width="100%"><br><sub><b>Logs</b>: cada linha ligada à requisição ou job que a escreveu.</sub></td>
+    <td width="50%"><img src="./docs/search.jpg" alt="Busca rápida com Ctrl+K" width="100%"><br><sub><b>Ctrl+K</b>: pula para qualquer tela, rota, serviço ou erro.</sub></td>
+  </tr>
+</table>
+
+A tela **Storage & settings** mostra o tamanho do banco, as linhas por tabela, a retenção e os deploys marcados.
 
 <p align="center">
   <img src="./docs/terminal.svg" alt="Instalação e execução do PulsePHP no terminal" width="90%">
@@ -109,12 +122,6 @@
 - ⚡ **Leve** — buffer em memória com gravação em lote, sem overhead por request.
 - 🧩 **Integrável** — funciona standalone em PHP puro ou plugado no Laravel 9+.
 - 🔐 **Seguro** — dashboard negado por padrão (Basic Auth + IPs + Gate).
-
-<p align="center">
-  <img src="./docs/dashboard-graficos.png" alt="Visão geral do PulsePHP no dashboard" width="90%">
-  <br/>
-  <sub>Tudo em um único SQLite: requisições, latência, queries, spans e chamadas externas.</sub>
-</p>
 
 ---
 
@@ -134,25 +141,11 @@
 - [x] Captura de chamadas do cliente `Http` do Laravel e do **Guzzle**; queries em PHP puro via **`TracedPDO`**.
 - [x] **Retenção** configurável, **sampling** e lista de caminhos ignorados.
 - [x] **Alertas** por webhook (JSON/Slack) e e-mail.
-- [x] Dashboard ao vivo com filtros por período, serviço e rota — assets embutidos, sem CDN.
+- [x] Dashboard com 8 telas, busca Ctrl+K, tema claro/escuro e atualização ao vivo — assets e fontes embutidos, sem CDN.
+- [x] **Erros com ciclo de vida** (aberto, resolvido, ignorado, regressão), **logs** correlacionados e **marcadores de deploy**.
 - [x] Segurança por padrão: dashboard negado até configurar uma política de acesso.
 - [x] Integração opcional com Laravel 9+ via auto-discovery.
 - [x] Dados sempre locais — nada sai da sua máquina (exceto os alertas que você configurar).
-
-<table>
-  <tr>
-    <td width="50%" align="center">
-      <img src="./docs/widgets.png" alt="Widgets de slow queries, slow spans e chamadas externas" width="100%">
-      <br/>
-      <sub><b>Widgets</b> — slow queries, spans e chamadas externas.</sub>
-    </td>
-    <td width="50%" align="center">
-      <img src="./docs/saude-rota-warning.png" alt="Saúde por rota com estado de atenção" width="100%">
-      <br/>
-      <sub><b>Saúde por rota</b> — detecção de degradação.</sub>
-    </td>
-  </tr>
-</table>
 
 ---
 
@@ -163,7 +156,7 @@
 | **Core** | PHP 8.1+ | Núcleo standalone, sem dependência de framework. |
 | **Integração** | Laravel 9+ | Service provider com auto-discovery (opcional). |
 | **Dados** | SQLite (`pdo_sqlite`) | Armazenamento local em arquivo único. |
-| **Dashboard** | HTML + Alpine.js + Chart.js | Filtros, gráficos, sparklines e auto-refresh; assets embutidos no pacote. |
+| **Dashboard** | PHP templates + Alpine.js + Chart.js | Telas renderizadas no servidor, CSS próprio e fontes IBM Plex embutidas; nenhum CDN. |
 | **Testes** | PHPUnit + Testbench | Suíte automatizada em PHP 8.1 a 8.4, incluindo integração com Laravel. |
 
 <p align="center">
@@ -171,7 +164,7 @@
   <img src="https://img.shields.io/badge/Laravel-FF2D20?style=for-the-badge&logo=laravel&logoColor=white" alt="Laravel">
   <img src="https://img.shields.io/badge/SQLite-003B57?style=for-the-badge&logo=sqlite&logoColor=white" alt="SQLite">
   <img src="https://img.shields.io/badge/Composer-885630?style=for-the-badge&logo=composer&logoColor=white" alt="Composer">
-  <img src="https://img.shields.io/badge/PHPUnit-3aa0ff?style=for-the-badge&logo=phpunit&logoColor=white" alt="PHPUnit">
+  <img src="https://img.shields.io/badge/PHPUnit-4f5b93?style=for-the-badge&logo=phpunit&logoColor=white" alt="PHPUnit">
 </p>
 
 ---
@@ -258,13 +251,7 @@ php examples/traffic.php --iterations=10
 
 > O script grava cada request imediatamente em `storage/database.sqlite`.
 
-Com o tráfego rodando, o dashboard ganha vida em segundos — incluindo a detecção de erros:
-
-<p align="center">
-  <img src="./docs/erros.png" alt="Painel de erros e exceções do PulsePHP" width="85%">
-  <br/>
-  <sub>Exceções recentes com classe, rota e serviço, capturadas automaticamente.</sub>
-</p>
+Com o tráfego rodando, o dashboard ganha vida em segundos: o script também marca um deploy, grava logs de requisições lentas e simula um N+1 na rota `/api/v1/orders`.
 
 ### Como instrumentar sua aplicação
 
@@ -305,6 +292,23 @@ $pulse = Pulse::getInstance();
 $pulse->beginTrace('job:enviar-email', 'JOB');
 // ... trabalho ...
 $pulse->writeBuffer();
+```
+
+**Logs** — grave linhas ligadas ao trace atual, ou plugue o handler no Monolog 3:
+
+```php
+Pulse::getInstance()->recordLog('warning', 'Estoque baixo', ['sku' => 'A-1']);
+
+use Monolog\Level;
+use PulsePHP\Logging\PulseLogHandler;
+
+$logger->pushHandler(new PulseLogHandler(Level::Warning));
+```
+
+**Deploys** — marque cada release; ela aparece como uma linha vertical nos gráficos:
+
+```bash
+vendor/bin/pulse deploy --db=storage/pulse.sqlite --version=v1.4.0
 ```
 
 ### Retenção e alertas (CLI)
@@ -391,6 +395,13 @@ Alertas usam `PULSE_ALERT_WEBHOOK` (JSON ou Slack) e/ou `PULSE_ALERT_MAIL_TO` (m
 - **Queries** via `DB::listen`, correlacionadas ao request ou job.
 - **Jobs de fila** viram traces próprios (`job:App\Jobs\...`) com span de duração.
 - O buffer é gravado ao fim de cada request e de cada job, então **Octane, Horizon e `queue:work`** não acumulam memória.
+- **Logs** a partir de `warning` (ajustável em `PULSE_LOG_LEVEL`), ligados ao request ou job. Logs que carregam uma exceção são pulados, porque a exceção já é registrada.
+
+Marque deploys no seu script de deploy para vê-los nos gráficos:
+
+```bash
+php artisan pulse:deploy "$(git rev-parse --short HEAD)"
+```
 
 As chamadas feitas com `Illuminate\Support\Facades\Http` aparecem como span `http.outbound:{host}` **e** na tabela de chamadas externas, com método, status e duração. Credenciais e query string são **removidas** da URL persistida por segurança:
 
@@ -424,6 +435,8 @@ As rotas web e API recebem contexto com o nome da rota resolvida ou seu URI. O s
 | `pulse.collect_queries` | `true` | Captura de consultas SQL. |
 | `pulse.collect_outbound_requests` | `true` | Captura de chamadas HTTP externas (cliente `Http` do Laravel). |
 | `pulse.collect_jobs` | `true` | Traces e spans para jobs de fila. |
+| `pulse.collect_logs` | `true` | Grava logs do Laravel (`PULSE_COLLECT_LOGS`). |
+| `pulse.log_level` | `warning` | Nível mínimo de log gravado (`PULSE_LOG_LEVEL`). |
 | `pulse.sample_rate` | `1.0` | Fração de requisições/jobs gravados (`PULSE_SAMPLE_RATE`). Exceções sempre são gravadas. |
 | `pulse.ignore_paths` | `/up,/health,...` | Caminhos nunca gravados, `*` é curinga (`PULSE_IGNORE_PATHS`). O dashboard é sempre ignorado. |
 | `pulse.max_buffer_size` | `1000` | Registros em memória que forçam uma gravação antecipada. |
@@ -443,16 +456,12 @@ vendor/bin/phpunit
 
 A suíte roda no GitHub Actions em **PHP 8.1 a 8.4**. Os testes de integração com Laravel (`--testsuite Laravel`) usam `orchestra/testbench` e rodam a partir do PHP 8.2.
 
-Para alterar classes CSS do dashboard, recompile o stylesheet embutido (requer Node.js):
-
-```bash
-composer build:assets
-```
+O dashboard não tem etapa de build: o CSS e o JS ficam em `src/Dashboard/resources/assets/` e são servidos pelo próprio PHP com cache.
 
 ```text
-...........................................................  59 / 59 (100%)
+......................................................................  70 / 70 (100%)
 
-OK (59 tests, 321 assertions)
+OK (70 tests, 420 assertions)
 ```
 
 ---

@@ -14,19 +14,70 @@ use Throwable;
 
 final class Dashboard
 {
+    private const PERIODS = [
+        '15m' => 'Last 15 minutes',
+        '1h' => 'Last hour',
+        '24h' => 'Last 24 hours',
+        '7d' => 'Last 7 days',
+    ];
+
+    private const PREVIOUS_LABELS = [
+        '15m' => 'previous 15 min',
+        '1h' => 'previous hour',
+        '24h' => 'previous day',
+        '7d' => 'previous week',
+    ];
+
+    private const SCREENS = [
+        'overview' => 'Overview',
+        'requests' => 'Requests',
+        'errors' => 'Errors',
+        'queries' => 'Queries',
+        'jobs' => 'Jobs',
+        'outbound' => 'Outbound HTTP',
+        'logs' => 'Logs',
+        'settings' => 'Storage & settings',
+    ];
+
+    /** Public name => [file inside resources/assets, content type]. */
+    private const ASSETS = [
+        'app.css' => ['app.css', 'text/css; charset=UTF-8'],
+        'app.js' => ['app.js', 'text/javascript; charset=UTF-8'],
+        'chart.js' => ['chart.umd.min.js', 'text/javascript; charset=UTF-8'],
+        'alpine.js' => ['alpine.min.js', 'text/javascript; charset=UTF-8'],
+        'fonts/plex-sans-400.woff2' => ['fonts/plex-sans-400.woff2', 'font/woff2'],
+        'fonts/plex-sans-500.woff2' => ['fonts/plex-sans-500.woff2', 'font/woff2'],
+        'fonts/plex-sans-600.woff2' => ['fonts/plex-sans-600.woff2', 'font/woff2'],
+        'fonts/plex-mono-400.woff2' => ['fonts/plex-mono-400.woff2', 'font/woff2'],
+        'fonts/plex-mono-500.woff2' => ['fonts/plex-mono-500.woff2', 'font/woff2'],
+    ];
+
+    private const JSON_FLAGS = JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_THROW_ON_ERROR;
+    private const CSRF_COOKIE = 'pulse_csrf';
+    private const MIN_COMPARABLE_REQUESTS = 20;
+
     private ?array $basicAuth = null;
     private ?array $allowedIps = null;
     private ?Closure $authorizationCallback = null;
     private bool $authorizationConfigured = false;
     private QueryEngine $queries;
+    private SQLiteStorage $storage;
     private string $dataEndpoint = 'dashboard-data.php';
     private int $nPlusOneThreshold = 5;
+    private ?string $formTokenField = null;
+    private ?string $formTokenValue = null;
+
+    /** @var array{query: array<string, mixed>, post: array<string, mixed>, cookies: array<string, mixed>, method: string, ip: string}|null */
+    private ?array $request = null;
+
+    /** @var array<string, string> Extra headers (cookies) for the current response. */
+    private array $responseHeaders = [];
 
     public function __construct(string $dbPath)
     {
         // Creates the database on first use and upgrades older schemas, so the
         // dashboard works before any telemetry has been written.
-        new SQLiteStorage($dbPath);
+        $this->storage = new SQLiteStorage($dbPath);
         $this->queries = new QueryEngine($dbPath);
     }
 
@@ -45,6 +96,41 @@ final class Dashboard
     public function withNPlusOneThreshold(int $threshold): self
     {
         $this->nPlusOneThreshold = max(2, $threshold);
+
+        return $this;
+    }
+
+    /**
+     * Form field the host framework uses for CSRF protection (e.g. Laravel's
+     * `_token`). Without it the dashboard protects its forms with its own
+     * double-submit cookie.
+     */
+    public function withFormToken(string $field, string $value): self
+    {
+        $this->formTokenField = $field;
+        $this->formTokenValue = $value;
+
+        return $this;
+    }
+
+    /**
+     * Supplies the current request explicitly. Frameworks should call this:
+     * long-running runtimes (Octane, RoadRunner) and test clients don't fill
+     * PHP's superglobals, which are used otherwise.
+     *
+     * @param array<string, mixed> $query
+     * @param array<string, mixed> $post
+     * @param array<string, mixed> $cookies
+     */
+    public function withRequest(array $query, array $post, array $cookies, string $method, string $ip): self
+    {
+        $this->request = [
+            'query' => $query,
+            'post' => $post,
+            'cookies' => $cookies,
+            'method' => strtoupper($method),
+            'ip' => $ip,
+        ];
 
         return $this;
     }
@@ -95,7 +181,8 @@ final class Dashboard
     }
 
     /**
-     * Builds the dashboard HTML response without emitting it.
+     * Builds the dashboard response (page, asset, or form action) without
+     * emitting it.
      *
      * Framework integrations (e.g. Laravel) must use this method so the HTTP
      * status and headers are returned explicitly instead of relying on the
@@ -108,44 +195,43 @@ final class Dashboard
             return $this->accessDeniedResponse($denialStatus);
         }
 
-        $traceId = $_GET['trace'] ?? null;
-        if (is_string($traceId) && $traceId !== '') {
-            return $this->traceResponse($traceId);
+        $asset = $this->input('query')['asset'] ?? null;
+        if (is_string($asset)) {
+            return $this->assetResponse($asset);
         }
 
-        extract($this->collectDashboardData(), EXTR_SKIP);
+        if ($this->input('method') === 'POST') {
+            return $this->actionResponse();
+        }
 
-        $requestCount = number_format($stats['requests_total']);
-        $averageDuration = number_format($stats['avg_response_ms'], 2);
-        $peakMemory = number_format($stats['peak_memory_bytes'] / 1_048_576, 1);
-        $exceptionCount = number_format($stats['exceptions_total']);
-        $periodLabel = $periods[$period];
-        $liveDataJson = json_encode([
-            'stats' => $stats,
-            'chartData' => $chartData,
-            'routeCards' => $routeCards,
-            'exceptions' => $exceptions,
-            'exceptionGroups' => $exceptionGroups,
-            'generatedAt' => gmdate('c'),
-        ], JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_THROW_ON_ERROR);
-        $dataEndpointJson = json_encode(
-            $this->dataEndpoint,
-            JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR
-        );
-        $assets = $this->assets();
+        $traceId = $this->input('query')['trace'] ?? null;
+        if (is_string($traceId) && $traceId !== '') {
+            $trace = $this->queries->getTrace($traceId);
 
-        ob_start();
-        require __DIR__ . '/resources/views/dashboard.php';
-        $html = (string) ob_get_clean();
+            return $this->page('trace', $trace === null ? 'Trace not found' : 'Trace', [
+                'trace' => $trace,
+                'waterfall' => $trace === null ? null : TraceWaterfall::build($trace),
+            ], $trace === null ? 404 : 200);
+        }
 
-        return new DashboardResponse(200, $html, [
-            'Content-Type' => 'text/html; charset=UTF-8',
-            'Cache-Control' => 'no-store, private',
-        ]);
+        $view = $this->input('query')['view'] ?? 'overview';
+        $view = is_string($view) ? $view : 'overview';
+
+        return match ($view) {
+            'requests' => $this->page('requests', 'Requests', $this->requestsData()),
+            'errors' => $this->page('errors', 'Errors', $this->errorsData()),
+            'error' => $this->errorDetailPage(),
+            'queries' => $this->page('queries', 'Queries', $this->queriesData()),
+            'jobs' => $this->page('jobs', 'Jobs', $this->jobsData()),
+            'outbound' => $this->page('outbound', 'Outbound HTTP', $this->outboundData()),
+            'logs' => $this->page('logs', 'Logs', $this->logsData()),
+            'settings' => $this->page('settings', 'Storage & settings', $this->settingsData()),
+            default => $this->page('overview', 'Overview', $this->overviewData()),
+        };
     }
 
     /**
-     * Builds the dashboard JSON snapshot without emitting it.
+     * Builds the live overview JSON snapshot without emitting it.
      */
     public function handleJson(): DashboardResponse
     {
@@ -168,162 +254,468 @@ final class Dashboard
             );
         }
 
-        $data = $this->collectDashboardData();
-
-        return new DashboardResponse(200, json_encode([
-            'stats' => $data['stats'],
-            'chartData' => $data['chartData'],
-            'routeCards' => $data['routeCards'],
-            'exceptions' => $data['exceptions'],
-            'exceptionGroups' => $data['exceptionGroups'],
-            'generatedAt' => gmdate('c'),
-        ], JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_THROW_ON_ERROR), $headers);
+        return new DashboardResponse(
+            200,
+            json_encode($this->overviewData()['live'], self::JSON_FLAGS),
+            $headers
+        );
     }
 
     /** @return array<string, mixed> */
-    private function collectDashboardData(): array
+    private function scope(): array
     {
-        $periods = [
-            '15m' => 'Last 15 minutes',
-            '1h' => 'Last hour',
-            '24h' => 'Last 24 hours',
-            '7d' => 'Last 7 days',
-        ];
-        $period = $this->selectedPeriod($_GET['period'] ?? null, $periods);
+        $period = $this->input('query')['period'] ?? null;
+        $period = is_string($period) && isset(self::PERIODS[$period]) ? $period : '1h';
         $services = $this->queries->getAvailableServices();
-        $selectedService = $this->selectedOption($_GET['service'] ?? null, $services);
-        $routes = $this->queries->getAvailableRoutes($selectedService);
-        $selectedRoute = $this->selectedOption($_GET['route'] ?? null, $routes);
-
-        $stats = $this->queries->getSummaryStats($period, $selectedService, $selectedRoute);
-        $timeline = $this->queries->getRequestTimeline($period, $selectedService, $selectedRoute);
-        $exceptionTimeline = $this->queries->getExceptionTimeline($period, $selectedService, $selectedRoute);
-        $slowQueries = $this->queries->getSlowestQueries(100, $period, $selectedService, $selectedRoute);
-        $spans = $this->queries->getTopSpans(100, $period, $selectedService, $selectedRoute);
-        $outboundRequests = $this->queries->getOutboundRequests(100, $period, $selectedService, $selectedRoute);
-        $requests = $this->queries->getRecentRequests(100, $period, $selectedService, $selectedRoute);
-        $exceptions = $this->queries->getLatestExceptions(100, $period, $selectedService, $selectedRoute);
-        $exceptionGroups = $this->queries->getExceptionGroups(100, $period, $selectedService, $selectedRoute);
-        $nPlusOne = $this->queries->getNPlusOneQueries(
-            $this->nPlusOneThreshold,
-            50,
-            $period,
-            $selectedService,
-            $selectedRoute
-        );
+        $service = $this->selectedOption($this->input('query')['service'] ?? null, $services);
+        $routes = $this->queries->getAvailableRoutes($service);
+        $route = $this->selectedOption($this->input('query')['route'] ?? null, $routes);
         [$from, $to] = $this->periodBounds($period);
-        $routeMetrics = $this->queries->getMetricsByRoute($from, $to, $selectedService);
-        if ($selectedRoute !== null) {
-            $routeMetrics = array_values(array_filter(
-                $routeMetrics,
-                static fn (array $metric): bool => $metric['route'] === $selectedRoute
-            ));
-        }
+
+        return [
+            'period' => $period,
+            'periodLabel' => self::PERIODS[$period],
+            'periods' => self::PERIODS,
+            'services' => $services,
+            'service' => $service,
+            'routes' => $routes,
+            'route' => $route,
+            'from' => $from,
+            'to' => $to,
+        ];
+    }
+
+    /** @return array<string, mixed> */
+    private function overviewData(): array
+    {
+        $scope = $this->scope();
+        ['period' => $period, 'service' => $service, 'route' => $route, 'from' => $from, 'to' => $to] = $scope;
+
+        $current = $this->queries->getWindowMetrics($from, $to, $service, $route);
+        $previousFrom = (new DateTimeImmutable($from, new DateTimeZone('UTC')))
+            ->modify('-' . $this->periodSeconds($period) . ' seconds')
+            ->format('Y-m-d H:i:s');
+        $previous = $this->queries->getWindowMetrics($previousFrom, $from, $service, $route);
+
+        $stats = $this->queries->getSummaryStats($period, $service, $route);
+        $requestTimeline = $this->queries->getRequestTimeline($period, $service, $route);
+        $exceptionTimeline = $this->queries->getExceptionTimeline($period, $service, $route);
+        $deploys = $this->queries->getDeploys($period, $service);
+        $labels = array_values(array_unique(array_merge(
+            array_column($requestTimeline, 'minute'),
+            array_column($exceptionTimeline, 'minute')
+        )));
+        sort($labels);
+        $requestsByBucket = array_column($requestTimeline, 'requests', 'minute');
+        $errorsByBucket = array_column($exceptionTimeline, 'exceptions', 'minute');
 
         $routeCards = [];
-        $routeCharts = [];
-        foreach (array_slice($routeMetrics, 0, 12) as $metric) {
-            $health = $this->routeHealth($metric);
-            $metric['health'] = $health;
-            $metric['slow_requests'] = $this->queries->getSlowestRequestsByRoute(
-                $from,
-                $to,
-                $metric['service'],
-                $metric['route'],
-                $metric['method'],
-                5
-            );
-            $chartId = substr(
+        foreach ($this->queries->getMetricsByRoute($from, $to, $service) as $metric) {
+            if ($route !== null && $metric['route'] !== $route) {
+                continue;
+            }
+            $metric['health'] = $this->routeHealth($metric);
+            $metric['chart_id'] = substr(
                 hash('sha256', $metric['service'] . "\0" . $metric['route'] . "\0" . $metric['method']),
                 0,
                 16
             );
-            $metric['chart_id'] = $chartId;
-            $routeCharts[$chartId] = [
-                'labels' => array_column($metric['timeline'], 'timestamp'),
-                'values' => array_column($metric['timeline'], 'avg_duration_ms'),
-                'color' => $health['color'],
-            ];
             $routeCards[] = $metric;
         }
-        $routeChartsJson = json_encode(
-            $routeCharts,
-            JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_THROW_ON_ERROR
-        );
+        $severity = ['critical' => 0, 'warning' => 1, 'healthy' => 2];
+        usort($routeCards, static fn (array $a, array $b): int => [$severity[$a['health']['key']], -$a['total_requests']]
+            <=> [$severity[$b['health']['key']], -$b['total_requests']]);
 
-        $chartData = [
-            'requests' => [
-                'labels' => array_column($timeline, 'minute'),
-                'values' => array_column($timeline, 'requests'),
+        $exceptionGroups = $this->queries->getExceptionGroups(100, $period, $service, $route);
+        $openGroups = array_values(array_filter(
+            $exceptionGroups,
+            static fn (array $group): bool => in_array($group['status'], ['open', 'regressed'], true)
+        ));
+
+        $live = [
+            'stats' => $stats,
+            'vitals' => $this->vitals($current, $previous, $period),
+            'chartData' => [
+                'labels' => $labels,
+                'requests' => array_map(static fn (string $label): int => (int) ($requestsByBucket[$label] ?? 0), $labels),
+                'exceptions' => array_map(static fn (string $label): int => (int) ($errorsByBucket[$label] ?? 0), $labels),
+                'deploys' => $this->deployMarkers($deploys, $period),
             ],
-            'queries' => [
-                'labels' => array_map(
-                    static fn (array $query): string => $query['normalized_sql'],
-                    array_slice($slowQueries, 0, 10)
-                ),
-                'values' => array_map(
-                    static fn (array $query): float => $query['avg_duration_ms'],
-                    array_slice($slowQueries, 0, 10)
-                ),
-            ],
-            'spans' => [
-                'labels' => array_map(
-                    static fn (array $span): string => $span['name'] . ' · ' . $span['service'],
-                    array_slice($spans, 0, 10)
-                ),
-                'values' => array_map(
-                    static fn (array $span): float => $span['avg_duration_ms'],
-                    array_slice($spans, 0, 10)
-                ),
-            ],
-            'outbound' => [
-                'labels' => array_map(
-                    static fn (array $request): string => $request['method'] . ' ' . $request['url'],
-                    array_reverse(array_slice($outboundRequests, 0, 20))
-                ),
-                'values' => array_map(
-                    static fn (array $request): float => $request['duration_ms'],
-                    array_reverse(array_slice($outboundRequests, 0, 20))
-                ),
-            ],
-            'exceptions' => [
-                'labels' => array_column($exceptionTimeline, 'minute'),
-                'values' => array_column($exceptionTimeline, 'exceptions'),
-            ],
+            'routeCards' => array_slice($routeCards, 0, 12),
+            'exceptions' => $this->queries->getLatestExceptions(20, $period, $service, $route),
+            'exceptionGroups' => array_slice($openGroups, 0, 8),
+            'generatedAt' => gmdate('c'),
         ];
-        $chartsJson = json_encode(
-            $chartData,
-            JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_THROW_ON_ERROR
-        );
 
-        return compact(
-            'periods',
-            'period',
-            'services',
-            'selectedService',
-            'routes',
-            'selectedRoute',
-            'stats',
-            'timeline',
-            'exceptionTimeline',
-            'slowQueries',
-            'spans',
-            'outboundRequests',
-            'requests',
-            'exceptions',
-            'exceptionGroups',
-            'nPlusOne',
-            'routeCards',
-            'routeChartsJson',
-            'chartData',
-            'chartsJson'
+        return [
+            'live' => $live,
+            'deploys' => $deploys,
+            'nPlusOne' => $this->queries->getNPlusOneQueries($this->nPlusOneThreshold, 5, $period, $service, $route),
+        ];
+    }
+
+    /** @return array<string, mixed> */
+    private function requestsData(): array
+    {
+        $scope = $this->scope();
+        $filters = [
+            'status' => $this->stringParam('status', ['2xx', '3xx', '4xx', '5xx']),
+            'method' => $this->stringParam('method', ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'HEAD', 'OPTIONS']),
+            'min_ms' => is_numeric($this->input('query')['min_ms'] ?? null) ? (float) $this->input('query')['min_ms'] : null,
+            'search' => is_string($this->input('query')['q'] ?? null) ? substr(trim($this->input('query')['q']), 0, 200) : null,
+        ];
+        $page = max(1, (int) ($this->input('query')['page'] ?? 1));
+        $result = $this->queries->searchRequests($filters + [
+            'period' => $scope['period'],
+            'service' => $scope['service'],
+            'route' => $scope['route'],
+        ], $page, 50);
+
+        return [
+            'filters' => $filters,
+            'page' => $page,
+            'perPage' => 50,
+            'total' => $result['total'],
+            'rows' => $result['rows'],
+        ];
+    }
+
+    /** @return array<string, mixed> */
+    private function errorsData(): array
+    {
+        $scope = $this->scope();
+        $status = $this->stringParam('status', ['open', 'resolved', 'ignored', 'all']) ?? 'open';
+
+        return [
+            'status' => $status,
+            'groups' => $this->queries->getExceptionGroups(
+                100,
+                $scope['period'],
+                $scope['service'],
+                $scope['route'],
+                $status === 'all' ? null : $status
+            ),
+        ];
+    }
+
+    private function errorDetailPage(): DashboardResponse
+    {
+        $fingerprint = $this->input('query')['id'] ?? '';
+        $detail = is_string($fingerprint) && $fingerprint !== '' && strlen($fingerprint) <= 512
+            ? $this->queries->getExceptionGroup($fingerprint, $this->scope()['period'])
+            : null;
+
+        return $this->page(
+            'error',
+            $detail === null ? 'Error not found' : $detail['group']['class'],
+            ['detail' => $detail],
+            $detail === null ? 404 : 200
         );
     }
 
-    /** @param array<string, string> $periods */
-    private function selectedPeriod(mixed $value, array $periods): string
+    /** @return array<string, mixed> */
+    private function queriesData(): array
     {
-        return is_string($value) && isset($periods[$value]) ? $value : '1h';
+        $scope = $this->scope();
+
+        return [
+            'slowQueries' => $this->queries->getSlowestQueries(100, $scope['period'], $scope['service'], $scope['route']),
+            'nPlusOne' => $this->queries->getNPlusOneQueries(
+                $this->nPlusOneThreshold,
+                50,
+                $scope['period'],
+                $scope['service'],
+                $scope['route']
+            ),
+            'threshold' => $this->nPlusOneThreshold,
+        ];
+    }
+
+    /** @return array<string, mixed> */
+    private function jobsData(): array
+    {
+        $scope = $this->scope();
+
+        return ['jobs' => $this->queries->getJobs($scope['period'], $scope['service'])];
+    }
+
+    /** @return array<string, mixed> */
+    private function outboundData(): array
+    {
+        $scope = $this->scope();
+
+        return [
+            'hosts' => $this->queries->getOutboundHosts($scope['period'], $scope['service'], $scope['route']),
+            'calls' => $this->queries->getOutboundRequests(100, $scope['period'], $scope['service'], $scope['route']),
+        ];
+    }
+
+    /** @return array<string, mixed> */
+    private function logsData(): array
+    {
+        $scope = $this->scope();
+        $level = $this->stringParam('level', ['emergency', 'alert', 'critical', 'error', 'warning', 'notice', 'info', 'debug']);
+        $search = is_string($this->input('query')['q'] ?? null) ? substr(trim($this->input('query')['q']), 0, 200) : null;
+
+        return [
+            'level' => $level,
+            'search' => $search,
+            'logs' => $this->queries->getLogs(200, $scope['period'], $scope['service'], $scope['route'], $level, $search),
+        ];
+    }
+
+    /** @return array<string, mixed> */
+    private function settingsData(): array
+    {
+        return [
+            'storage' => $this->queries->getStorageInfo(),
+            'deploys' => $this->queries->getDeploys('7d'),
+            'nPlusOneThreshold' => $this->nPlusOneThreshold,
+        ];
+    }
+
+    /**
+     * Renders a screen inside the shared layout.
+     *
+     * @param array<string, mixed> $data
+     */
+    private function page(string $screen, string $title, array $data, int $status = 200): DashboardResponse
+    {
+        $scope = $this->scope();
+        $page = [
+            'screen' => $screen,
+            'title' => $title,
+            'nav' => self::SCREENS,
+            'openErrors' => count($this->queries->getExceptionGroups(100, $scope['period'], $scope['service'], $scope['route'], 'open')),
+            'assetVersion' => $this->assetVersion(),
+            'dataEndpoint' => $this->dataEndpoint,
+            'csrf' => $this->csrfField(),
+            'palette' => $this->paletteItems($scope),
+        ];
+
+        $view = new View(__DIR__ . '/resources/views', $scope);
+        $html = $view->render('layout', ['page' => $page, 'data' => $data]);
+
+        return new DashboardResponse($status, $html, [
+            'Content-Type' => 'text/html; charset=UTF-8',
+            'Cache-Control' => 'no-store, private',
+            'X-Content-Type-Options' => 'nosniff',
+            'Referrer-Policy' => 'same-origin',
+        ] + $this->responseHeaders);
+    }
+
+    private function actionResponse(): DashboardResponse
+    {
+        if (!$this->validCsrf()) {
+            return new DashboardResponse(419, 'The form expired. Reload the page and try again.', [
+                'Content-Type' => 'text/plain; charset=UTF-8',
+                'Cache-Control' => 'no-store, private',
+            ]);
+        }
+
+        $action = $this->input('post')['action'] ?? null;
+        $fingerprint = $this->input('post')['fingerprint'] ?? null;
+        $statuses = ['resolve' => 'resolved', 'ignore' => 'ignored', 'reopen' => 'open'];
+        if (!is_string($action) || !isset($statuses[$action])
+            || !is_string($fingerprint) || $fingerprint === '' || strlen($fingerprint) > 512) {
+            return new DashboardResponse(422, 'Unknown action.', [
+                'Content-Type' => 'text/plain; charset=UTF-8',
+                'Cache-Control' => 'no-store, private',
+            ]);
+        }
+
+        $this->storage->setExceptionStatus($fingerprint, $statuses[$action]);
+
+        return new DashboardResponse(303, '', [
+            'Location' => '?' . http_build_query(['view' => 'error', 'id' => $fingerprint]),
+            'Cache-Control' => 'no-store, private',
+        ]);
+    }
+
+    private function assetResponse(string $name): DashboardResponse
+    {
+        if (!isset(self::ASSETS[$name])) {
+            return new DashboardResponse(404, 'Not found', ['Content-Type' => 'text/plain; charset=UTF-8']);
+        }
+
+        [$file, $contentType] = self::ASSETS[$name];
+        $contents = @file_get_contents(__DIR__ . '/resources/assets/' . $file);
+        if ($contents === false) {
+            return new DashboardResponse(404, 'Not found', ['Content-Type' => 'text/plain; charset=UTF-8']);
+        }
+
+        return new DashboardResponse(200, $contents, [
+            'Content-Type' => $contentType,
+            'Cache-Control' => ($this->input('query')['v'] ?? null) === $this->assetVersion()
+                ? 'private, max-age=31536000, immutable'
+                : 'private, max-age=300',
+            'X-Content-Type-Options' => 'nosniff',
+        ]);
+    }
+
+    private function assetVersion(): string
+    {
+        $fingerprint = '';
+        foreach (['app.css', 'app.js', 'chart.umd.min.js', 'alpine.min.js'] as $file) {
+            $path = __DIR__ . '/resources/assets/' . $file;
+            $fingerprint .= is_file($path) ? filemtime($path) . ':' . filesize($path) . ';' : '';
+        }
+
+        return substr(hash('sha256', $fingerprint), 0, 12);
+    }
+
+    /** @return array{name: string, value: string} */
+    private function csrfField(): array
+    {
+        if ($this->formTokenField !== null && $this->formTokenValue !== null) {
+            return ['name' => $this->formTokenField, 'value' => $this->formTokenValue];
+        }
+
+        $token = $this->input('cookies')[self::CSRF_COOKIE] ?? null;
+        if (!is_string($token) || preg_match('/^[a-f0-9]{64}$/', $token) !== 1) {
+            $token = bin2hex(random_bytes(32));
+            $this->responseHeaders['Set-Cookie'] = self::CSRF_COOKIE . '=' . $token
+                . '; Path=/; HttpOnly; SameSite=Strict';
+        }
+
+        return ['name' => self::CSRF_COOKIE, 'value' => $token];
+    }
+
+    private function validCsrf(): bool
+    {
+        // The host framework (e.g. Laravel's VerifyCsrfToken) already checked it.
+        if ($this->formTokenField !== null) {
+            return true;
+        }
+
+        $cookie = $this->input('cookies')[self::CSRF_COOKIE] ?? null;
+        $field = $this->input('post')[self::CSRF_COOKIE] ?? null;
+
+        return is_string($cookie) && is_string($field) && $cookie !== '' && hash_equals($cookie, $field);
+    }
+
+    /**
+     * @param array{requests: int, error_rate_percent: float, p95_ms: float, exceptions: int} $current
+     * @param array{requests: int, error_rate_percent: float, p95_ms: float, exceptions: int} $previous
+     * @return list<array{key: string, label: string, value: float, unit: string, delta: string, trend: string}>
+     */
+    private function vitals(array $current, array $previous, string $period): array
+    {
+        $versus = 'vs ' . self::PREVIOUS_LABELS[$period];
+        // Percentages against a handful of requests are noise ("+8000%"), so
+        // comparisons need a minimum amount of traffic in the previous window.
+        $comparable = $previous['requests'] >= self::MIN_COMPARABLE_REQUESTS;
+        $unavailable = $current['requests'] === 0 && $previous['requests'] === 0
+            ? 'No traffic yet'
+            : 'Not enough data for the ' . substr($versus, 3);
+
+        $relative = static function (float $now, float $before, bool $higherIsWorse) use ($versus, $comparable, $unavailable): array {
+            if (!$comparable) {
+                return [$unavailable, 'flat'];
+            }
+            if ($before <= 0.0) {
+                return [$now > 0 ? 'New ' . $versus : 'Steady ' . $versus, $now > 0 && $higherIsWorse ? 'worse' : 'flat'];
+            }
+            $change = ($now - $before) / $before * 100;
+            if (abs($change) < 1) {
+                return ['Steady ' . $versus, 'flat'];
+            }
+            $worse = $higherIsWorse ? $change > 0 : $change < 0;
+            $label = abs($change) >= 1000
+                ? sprintf('%s %s', $change > 0 ? sprintf('%.0f× higher', $now / $before) : 'Down sharply', $versus)
+                : sprintf('%s%.0f%% %s', $change > 0 ? '+' : '−', abs($change), $versus);
+
+            return [$label, $worse ? 'worse' : 'better'];
+        };
+
+        [$throughputDelta] = $relative((float) $current['requests'], (float) $previous['requests'], false);
+        [$p95Delta, $p95Trend] = $relative($current['p95_ms'], $previous['p95_ms'], true);
+        [$exceptionDelta, $exceptionTrend] = $relative((float) $current['exceptions'], (float) $previous['exceptions'], true);
+        $pointChange = $current['error_rate_percent'] - $previous['error_rate_percent'];
+        if (!$comparable) {
+            [$errorDelta, $errorTrend] = [$unavailable, 'flat'];
+        } elseif (abs($pointChange) < 0.05) {
+            [$errorDelta, $errorTrend] = ['Steady ' . $versus, 'flat'];
+        } else {
+            $errorDelta = sprintf('%s%.1f pts %s', $pointChange > 0 ? '+' : '−', abs($pointChange), $versus);
+            $errorTrend = $pointChange > 0 ? 'worse' : 'better';
+        }
+
+        return [
+            ['key' => 'requests', 'label' => 'Requests', 'value' => (float) $current['requests'], 'unit' => '', 'delta' => $throughputDelta, 'trend' => 'flat'],
+            ['key' => 'p95', 'label' => 'p95 latency', 'value' => $current['p95_ms'], 'unit' => 'ms', 'delta' => $p95Delta, 'trend' => $p95Trend],
+            ['key' => 'error_rate', 'label' => 'Server error rate', 'value' => $current['error_rate_percent'], 'unit' => '%', 'delta' => $errorDelta, 'trend' => $errorTrend],
+            ['key' => 'exceptions', 'label' => 'Exceptions', 'value' => (float) $current['exceptions'], 'unit' => '', 'delta' => $exceptionDelta, 'trend' => $exceptionTrend],
+        ];
+    }
+
+    /**
+     * @param list<array{version: string, service: string, created_at: string}> $deploys
+     * @return list<array{bucket: string, version: string}>
+     */
+    private function deployMarkers(array $deploys, string $period): array
+    {
+        $format = match ($period) {
+            '24h' => 'Y-m-d H:00:00',
+            '7d' => 'Y-m-d 00:00:00',
+            default => 'Y-m-d H:i:00',
+        };
+
+        return array_map(static fn (array $deploy): array => [
+            'bucket' => (new DateTimeImmutable((string) $deploy['created_at'], new DateTimeZone('UTC')))->format($format),
+            'version' => (string) $deploy['version'],
+        ], $deploys);
+    }
+
+    /**
+     * @param array<string, mixed> $scope
+     * @return list<array{label: string, kind: string, url: string}>
+     */
+    private function paletteItems(array $scope): array
+    {
+        $items = [];
+        foreach (self::SCREENS as $key => $label) {
+            $items[] = ['label' => $label, 'kind' => 'Screen', 'url' => '?' . http_build_query(['view' => $key, 'period' => $scope['period']])];
+        }
+        foreach (array_slice($scope['routes'], 0, 200) as $route) {
+            $items[] = ['label' => $route, 'kind' => 'Route', 'url' => '?' . http_build_query(['view' => 'requests', 'period' => $scope['period'], 'route' => $route])];
+        }
+        foreach ($scope['services'] as $service) {
+            $items[] = ['label' => $service, 'kind' => 'Service', 'url' => '?' . http_build_query(['period' => $scope['period'], 'service' => $service])];
+        }
+        foreach ($this->queries->getExceptionGroups(30, '7d') as $group) {
+            $items[] = [
+                'label' => ($group['class'] !== '' ? $group['class'] . ': ' : '') . mb_strimwidth($group['message'], 0, 90, '…'),
+                'kind' => 'Error',
+                'url' => '?' . http_build_query(['view' => 'error', 'id' => $group['fingerprint'], 'period' => $scope['period']]),
+            ];
+        }
+
+        return $items;
+    }
+
+    /** @return ($part is 'method'|'ip' ? string : array<string, mixed>) */
+    private function input(string $part): string|array
+    {
+        if ($this->request !== null) {
+            return $this->request[$part];
+        }
+
+        return match ($part) {
+            'query' => $_GET,
+            'post' => $_POST,
+            'cookies' => $_COOKIE,
+            'method' => strtoupper((string) ($_SERVER['REQUEST_METHOD'] ?? 'GET')),
+            'ip' => (string) ($_SERVER['REMOTE_ADDR'] ?? ''),
+        };
+    }
+
+    /** @param list<string> $allowed */
+    private function stringParam(string $name, array $allowed): ?string
+    {
+        $value = $this->input('query')[$name] ?? null;
+
+        return is_string($value) && in_array($value, $allowed, true) ? $value : null;
     }
 
     /** @param list<string> $options */
@@ -332,19 +724,24 @@ final class Dashboard
         return is_string($value) && in_array($value, $options, true) ? $value : null;
     }
 
+    private function periodSeconds(string $period): int
+    {
+        return match ($period) {
+            '15m' => 15 * 60,
+            '24h' => 24 * 3600,
+            '7d' => 7 * 24 * 3600,
+            default => 3600,
+        };
+    }
+
     /** @return array{string, string} */
     private function periodBounds(string $period): array
     {
         $to = new DateTimeImmutable('now', new DateTimeZone('UTC'));
-        $modifier = match ($period) {
-            '15m' => '-15 minutes',
-            '24h' => '-24 hours',
-            '7d' => '-7 days',
-            default => '-1 hour',
-        };
-        $from = $to->modify($modifier);
+        $from = $to->modify('-' . $this->periodSeconds($period) . ' seconds');
 
-        return [$from->format('Y-m-d H:i:s'), $to->format('Y-m-d H:i:s')];
+        // `to` is exclusive in window queries; include the current second.
+        return [$from->format('Y-m-d H:i:s'), $to->modify('+1 second')->format('Y-m-d H:i:s')];
     }
 
     /** @param array{avg_duration_ms: float, error_rate_percent: float, unhandled_exceptions: int} $metric
@@ -355,51 +752,14 @@ final class Dashboard
         if ($metric['unhandled_exceptions'] > 0
             || $metric['avg_duration_ms'] > 1000
             || $metric['error_rate_percent'] > 5) {
-            return ['key' => 'critical', 'label' => 'Critical', 'color' => '#f16d76'];
+            return ['key' => 'critical', 'label' => 'Critical', 'color' => 'crit'];
         }
 
         if ($metric['avg_duration_ms'] >= 300 || $metric['error_rate_percent'] >= 1) {
-            return ['key' => 'warning', 'label' => 'Warning', 'color' => '#e7b957'];
+            return ['key' => 'warning', 'label' => 'Slow', 'color' => 'warn'];
         }
 
-        return ['key' => 'healthy', 'label' => 'Healthy', 'color' => '#42c98a'];
-    }
-
-    private function traceResponse(string $traceId): DashboardResponse
-    {
-        $trace = $this->queries->getTrace($traceId);
-        $assets = $this->assets();
-
-        ob_start();
-        require __DIR__ . '/resources/views/trace.php';
-        $html = (string) ob_get_clean();
-
-        return new DashboardResponse($trace === null ? 404 : 200, $html, [
-            'Content-Type' => 'text/html; charset=UTF-8',
-            'Cache-Control' => 'no-store, private',
-        ]);
-    }
-
-    /**
-     * Bundled front-end assets, inlined so the dashboard works offline and
-     * never loads third-party code from a CDN.
-     *
-     * @return array{css: string, chart: string, alpine: string}
-     */
-    private function assets(): array
-    {
-        $directory = __DIR__ . '/resources/assets/';
-        $read = static function (string $file) use ($directory): string {
-            $contents = @file_get_contents($directory . $file);
-
-            return $contents === false ? '' : $contents;
-        };
-
-        return [
-            'css' => $read('dashboard.css'),
-            'chart' => $read('chart.umd.min.js'),
-            'alpine' => $read('alpine.min.js'),
-        ];
+        return ['key' => 'healthy', 'label' => 'Healthy', 'color' => 'ok'];
     }
 
     private function getDenialStatus(): ?int
@@ -422,7 +782,7 @@ final class Dashboard
         }
 
         if ($this->allowedIps !== null
-            && !in_array((string) ($_SERVER['REMOTE_ADDR'] ?? ''), $this->allowedIps, true)) {
+            && !in_array($this->input('ip'), $this->allowedIps, true)) {
             return 403;
         }
 

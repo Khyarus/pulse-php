@@ -19,7 +19,11 @@ final class SQLiteStorage implements StorageInterface
         'pulse_requests',
         'pulse_queries',
         'pulse_outbound_requests',
+        'pulse_logs',
+        'pulse_deploys',
     ];
+
+    public const EXCEPTION_STATUSES = ['open', 'resolved', 'ignored'];
 
     private PDO $pdo;
     private bool $inMemory;
@@ -80,6 +84,8 @@ final class SQLiteStorage implements StorageInterface
             $this->writeRequests($buffer['requests'] ?? []);
             $this->writeQueries($buffer['queries'] ?? []);
             $this->writeOutboundRequests($buffer['outbound_requests'] ?? []);
+            $this->writeLogs($buffer['logs'] ?? []);
+            $this->writeDeploys($buffer['deploys'] ?? []);
             $this->pdo->commit();
         } catch (Throwable $exception) {
             if ($this->pdo->inTransaction()) {
@@ -117,6 +123,10 @@ final class SQLiteStorage implements StorageInterface
             $deleted['pulse_catalog'] = (int) $this->pdo->exec(
                 'DELETE FROM pulse_catalog WHERE id NOT IN (SELECT DISTINCT catalog_id FROM pulse_queries)'
             );
+            $deleted['pulse_exception_states'] = (int) $this->pdo->exec(
+                'DELETE FROM pulse_exception_states '
+                . 'WHERE fingerprint NOT IN (SELECT DISTINCT fingerprint FROM pulse_exceptions)'
+            );
             $this->pdo->commit();
         } catch (Throwable $exception) {
             if ($this->pdo->inTransaction()) {
@@ -153,6 +163,31 @@ final class SQLiteStorage implements StorageInterface
         $statement->execute([':rule' => $rule]);
     }
 
+    /**
+     * Marks an exception group as open, resolved or ignored. A resolved group
+     * that happens again is reported as regressed by the query engine.
+     */
+    public function setExceptionStatus(string $fingerprint, string $status): void
+    {
+        if (!in_array($status, self::EXCEPTION_STATUSES, true)) {
+            throw new InvalidArgumentException('Unknown exception status: ' . $status);
+        }
+
+        if ($status === 'open') {
+            $statement = $this->pdo->prepare('DELETE FROM pulse_exception_states WHERE fingerprint = :fingerprint');
+            $statement->execute([':fingerprint' => $fingerprint]);
+
+            return;
+        }
+
+        $statement = $this->pdo->prepare(
+            'INSERT INTO pulse_exception_states (fingerprint, status, updated_at) '
+            . 'VALUES (:fingerprint, :status, CURRENT_TIMESTAMP) '
+            . 'ON CONFLICT(fingerprint) DO UPDATE SET status = excluded.status, updated_at = excluded.updated_at'
+        );
+        $statement->execute([':fingerprint' => $fingerprint, ':status' => $status]);
+    }
+
     private function writeMetrics(array $metrics): void
     {
         $statement = $this->pdo->prepare(
@@ -174,8 +209,8 @@ final class SQLiteStorage implements StorageInterface
     private function writeSpans(array $spans): void
     {
         $statement = $this->pdo->prepare(
-            'INSERT INTO pulse_spans (name, duration_ms, memory_bytes, service, route, trace_id) '
-            . 'VALUES (:name, :duration_ms, :memory_bytes, :service, :route, :trace_id)'
+            'INSERT INTO pulse_spans (name, duration_ms, memory_bytes, service, route, trace_id, offset_ms) '
+            . 'VALUES (:name, :duration_ms, :memory_bytes, :service, :route, :trace_id, :offset_ms)'
         );
 
         foreach ($spans as $span) {
@@ -186,6 +221,7 @@ final class SQLiteStorage implements StorageInterface
                 ':service' => $span['service'] ?? 'default',
                 ':route' => $span['route'] ?? '/',
                 ':trace_id' => $span['trace_id'] ?? '',
+                ':offset_ms' => $span['offset_ms'] ?? null,
             ]);
         }
     }
@@ -245,8 +281,8 @@ final class SQLiteStorage implements StorageInterface
     {
         $statement = $this->pdo->prepare(
             'INSERT INTO pulse_outbound_requests '
-            . '(service, route, method, status_code, url, duration_ms, trace_id) '
-            . 'VALUES (:service, :route, :method, :status_code, :url, :duration_ms, :trace_id)'
+            . '(service, route, method, status_code, url, duration_ms, trace_id, offset_ms) '
+            . 'VALUES (:service, :route, :method, :status_code, :url, :duration_ms, :trace_id, :offset_ms)'
         );
 
         foreach ($requests as $request) {
@@ -258,6 +294,43 @@ final class SQLiteStorage implements StorageInterface
                 ':url' => $request['url'],
                 ':duration_ms' => $request['duration_ms'],
                 ':trace_id' => $request['trace_id'] ?? '',
+                ':offset_ms' => $request['offset_ms'] ?? null,
+            ]);
+        }
+    }
+
+    private function writeLogs(array $logs): void
+    {
+        $statement = $this->pdo->prepare(
+            'INSERT INTO pulse_logs (level, message, context, service, route, trace_id) '
+            . 'VALUES (:level, :message, :context, :service, :route, :trace_id)'
+        );
+
+        foreach ($logs as $log) {
+            $statement->execute([
+                ':level' => $log['level'],
+                ':message' => $log['message'],
+                ':context' => json_encode(
+                    $log['context'] ?? [],
+                    JSON_PARTIAL_OUTPUT_ON_ERROR | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE
+                ) ?: '{}',
+                ':service' => $log['service'] ?? 'default',
+                ':route' => $log['route'] ?? '/',
+                ':trace_id' => $log['trace_id'] ?? '',
+            ]);
+        }
+    }
+
+    private function writeDeploys(array $deploys): void
+    {
+        $statement = $this->pdo->prepare(
+            'INSERT INTO pulse_deploys (version, service) VALUES (:version, :service)'
+        );
+
+        foreach ($deploys as $deploy) {
+            $statement->execute([
+                ':version' => $deploy['version'],
+                ':service' => $deploy['service'] ?? 'default',
             ]);
         }
     }
@@ -272,8 +345,8 @@ final class SQLiteStorage implements StorageInterface
             'SELECT id FROM pulse_catalog WHERE hash = :hash'
         );
         $queryStatement = $this->pdo->prepare(
-            'INSERT INTO pulse_queries (catalog_id, duration_ms, service, route, trace_id) '
-            . 'VALUES (:catalog_id, :duration_ms, :service, :route, :trace_id)'
+            'INSERT INTO pulse_queries (catalog_id, duration_ms, service, route, trace_id, offset_ms) '
+            . 'VALUES (:catalog_id, :duration_ms, :service, :route, :trace_id, :offset_ms)'
         );
 
         foreach ($queries as $query) {
@@ -294,6 +367,7 @@ final class SQLiteStorage implements StorageInterface
                 ':service' => $query['service'] ?? 'default',
                 ':route' => $query['route'] ?? '/',
                 ':trace_id' => $query['trace_id'] ?? '',
+                ':offset_ms' => $query['offset_ms'] ?? null,
             ]);
         }
     }
@@ -309,9 +383,10 @@ final class SQLiteStorage implements StorageInterface
             'route' => "TEXT NOT NULL DEFAULT '/'",
         ];
         $traced = $context + ['trace_id' => "TEXT NOT NULL DEFAULT ''"];
+        $timed = $traced + ['offset_ms' => 'REAL'];
         $tables = [
             'pulse_metrics' => $context,
-            'pulse_spans' => $traced,
+            'pulse_spans' => $timed,
             'pulse_exceptions' => $traced + [
                 'method' => "TEXT NOT NULL DEFAULT ''",
                 'unhandled' => 'INTEGER NOT NULL DEFAULT 0',
@@ -319,8 +394,8 @@ final class SQLiteStorage implements StorageInterface
                 'fingerprint' => "TEXT NOT NULL DEFAULT ''",
             ],
             'pulse_requests' => $traced,
-            'pulse_queries' => $traced,
-            'pulse_outbound_requests' => $traced,
+            'pulse_queries' => $timed,
+            'pulse_outbound_requests' => $timed,
         ];
 
         foreach ($tables as $table => $definitions) {

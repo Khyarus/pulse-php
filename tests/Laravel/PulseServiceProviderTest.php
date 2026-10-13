@@ -8,6 +8,7 @@ use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
+use Illuminate\Support\Facades\Log;
 use Orchestra\Testbench\TestCase;
 use PDO;
 use PulsePHP\Laravel\PulseServiceProvider;
@@ -68,6 +69,13 @@ final class PulseServiceProviderTest extends TestCase
             })->name('checkout');
 
             $router->get('/missing', static fn () => abort(404))->name('missing');
+
+            $router->get('/stock', static function () {
+                Log::warning('Stock is low', ['sku' => 'A-1']);
+                Log::info('Just chatter');
+
+                return 'ok';
+            })->name('stock');
         });
     }
 
@@ -168,6 +176,57 @@ final class PulseServiceProviderTest extends TestCase
         $this->artisan('pulse:check')
             ->expectsOutputToContain('Alerts are disabled')
             ->assertSuccessful();
+    }
+
+    public function test_warnings_are_stored_as_logs_linked_to_the_request(): void
+    {
+        $this->get('/stock')->assertOk();
+
+        $logs = $this->telemetry()->query('SELECT level, message, route, trace_id FROM pulse_logs')->fetchAll(PDO::FETCH_ASSOC);
+        self::assertCount(1, $logs, 'Info is below the default log_level.');
+        self::assertSame('warning', $logs[0]['level']);
+        self::assertSame('stock', $logs[0]['route']);
+        $request = $this->telemetry()->query('SELECT trace_id FROM pulse_requests')->fetchColumn();
+        self::assertSame($request, $logs[0]['trace_id']);
+    }
+
+    public function test_an_error_group_can_be_resolved_from_the_dashboard(): void
+    {
+        Gate::define('viewPulse', static fn (?object $user = null): bool => true);
+        $this->get('/boom')->assertStatus(500);
+        $fingerprint = $this->telemetry()->query('SELECT fingerprint FROM pulse_exceptions')->fetchColumn();
+
+        $this->get('/pulse?view=error&id=' . urlencode($fingerprint))
+            ->assertOk()
+            ->assertSee('Mark as resolved')
+            ->assertSee('name="_token"', false);
+
+        $this->post('/pulse?view=error&id=' . urlencode($fingerprint), [
+            'action' => 'resolve',
+            'fingerprint' => $fingerprint,
+        ])->assertStatus(303)->assertHeader('Location');
+
+        self::assertSame('resolved', $this->telemetry()->query('SELECT status FROM pulse_exception_states')->fetchColumn());
+    }
+
+    public function test_the_deploy_command_marks_a_release(): void
+    {
+        $this->artisan('pulse:deploy', ['version' => 'v3.1.0'])
+            ->expectsOutputToContain('Marked deploy v3.1.0')
+            ->assertSuccessful();
+
+        self::assertSame('v3.1.0', $this->telemetry()->query('SELECT version FROM pulse_deploys')->fetchColumn());
+    }
+
+    public function test_every_dashboard_screen_renders_inside_laravel(): void
+    {
+        Gate::define('viewPulse', static fn (?object $user = null): bool => true);
+        $this->get('/orders')->assertOk();
+
+        foreach (['overview', 'requests', 'errors', 'queries', 'jobs', 'outbound', 'logs', 'settings'] as $view) {
+            $this->get('/pulse?view=' . $view)->assertOk();
+        }
+        $this->get('/pulse?asset=app.css')->assertOk()->assertHeader('Content-Type', 'text/css; charset=UTF-8');
     }
 
     private function telemetry(): PDO

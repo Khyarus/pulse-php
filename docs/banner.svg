@@ -1,117 +1,47 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="1280" height="360" viewBox="0 0 1280 360" role="img" aria-label="PulsePHP — observabilidade local para PHP e Laravel">
   <defs>
-    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0" stop-color="#0b100e"/>
-      <stop offset="0.55" stop-color="#0e1613"/>
-      <stop offset="1" stop-color="#0b100e"/>
+    <pattern id="minor" width="8" height="8" patternUnits="userSpaceOnUse">
+      <path d="M8 0H0V8" fill="none" stroke="#f7e1e4" stroke-width="1"/>
+    </pattern>
+    <pattern id="major" width="40" height="40" patternUnits="userSpaceOnUse">
+      <rect width="40" height="40" fill="url(#minor)"/>
+      <path d="M40 0H0V40" fill="none" stroke="#efc3c8" stroke-width="1"/>
+    </pattern>
+    <linearGradient id="fade" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#fbf8f8" stop-opacity="1"/>
+      <stop offset="0.45" stop-color="#fbf8f8" stop-opacity="1"/>
+      <stop offset="0.7" stop-color="#fbf8f8" stop-opacity="0"/>
     </linearGradient>
-    <radialGradient id="glow" cx="0.82" cy="0.18" r="0.9">
-      <stop offset="0" stop-color="#42c98a" stop-opacity="0.28"/>
-      <stop offset="0.5" stop-color="#42c98a" stop-opacity="0.06"/>
-      <stop offset="1" stop-color="#42c98a" stop-opacity="0"/>
-    </radialGradient>
-    <linearGradient id="pulse" x1="0" y1="0" x2="1" y2="0">
-      <stop offset="0" stop-color="#42c98a"/>
-      <stop offset="0.5" stop-color="#8ff0bf"/>
-      <stop offset="1" stop-color="#42c98a"/>
-    </linearGradient>
-    <linearGradient id="stroke" x1="0" y1="0" x2="1" y2="0">
-      <stop offset="0" stop-color="#42c98a" stop-opacity="0"/>
-      <stop offset="0.5" stop-color="#42c98a" stop-opacity="0.9"/>
-      <stop offset="1" stop-color="#42c98a" stop-opacity="0"/>
-    </linearGradient>
+    <clipPath id="card"><rect x="1" y="1" width="1278" height="358" rx="14"/></clipPath>
     <style>
-      .title { font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; font-weight: 700; }
-      .sub   { font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; font-weight: 400; }
-      .mono  { font-family: 'Cascadia Code', Consolas, 'Courier New', monospace; }
+      .sans { font-family: 'IBM Plex Sans', 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; }
     </style>
   </defs>
 
-  <rect width="1280" height="360" fill="url(#bg)"/>
-  <rect width="1280" height="360" fill="url(#glow)"/>
+  <g clip-path="url(#card)">
+    <rect width="1280" height="360" fill="#fbf8f8"/>
+    <rect width="1280" height="360" fill="url(#major)"/>
+    <rect width="1280" height="360" fill="url(#fade)"/>
+    <!-- ECG trace across the paper -->
+    <path d="M700 236 H760 l10 -14 l10 14 H830 l14 -110 l18 168 l14 -84 l10 30 H950 l12 -22 l12 22 H1060 l14 -110 l18 168 l14 -84 l10 30 H1180 l10 -14 l10 14 H1280"
+          fill="none" stroke="#c8102e" stroke-width="3" stroke-linejoin="round" stroke-linecap="round"/>
+  </g>
+  <rect x="1" y="1" width="1278" height="358" rx="14" fill="none" stroke="#e8e1e6" stroke-width="2"/>
 
-  <!-- grid -->
-  <g stroke="#1a2723" stroke-width="1" opacity="0.65">
-    <path d="M0 60 H1280 M0 120 H1280 M0 180 H1280 M0 240 H1280 M0 300 H1280"/>
-    <path d="M160 0 V360 M320 0 V360 M480 0 V360 M640 0 V360 M800 0 V360 M960 0 V360 M1120 0 V360"/>
+  <g transform="translate(72 104)">
+    <path d="M0 22h16l5 -12 8 26 7 -20 4 6H64" fill="none" stroke="#c8102e" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
+    <text x="84" y="38" class="sans" font-size="48" font-weight="600" fill="#221d33" letter-spacing="-1">Pulse<tspan fill="#857f97" font-weight="400">PHP</tspan></text>
   </g>
 
-  <!-- logo mark -->
-  <g transform="translate(96 96)">
-    <rect width="76" height="76" rx="18" fill="#143b2c" stroke="#2a5a44" stroke-width="1.5"/>
-    <path d="M16 40 H28 L34 24 L44 56 L52 34 L58 44 H62"
-          fill="none" stroke="url(#pulse)" stroke-width="4"
-          stroke-linecap="round" stroke-linejoin="round"/>
-  </g>
+  <text x="72" y="206" class="sans" font-size="26" fill="#221d33">Observabilidade local para PHP e Laravel.</text>
+  <text x="72" y="244" class="sans" font-size="19" fill="#565068">Requisições, erros, queries, jobs e logs num único arquivo SQLite.</text>
 
-  <!-- title -->
-  <text x="200" y="150" class="title" font-size="72" fill="#e8f0eb">Pulse<tspan fill="#42c98a">PHP</tspan></text>
-  <text x="204" y="196" class="sub" font-size="26" fill="#9aa9a1">Observabilidade e telemetria local para PHP &amp; Laravel</text>
-
-  <!-- tags -->
-  <g class="mono" font-size="15" text-anchor="middle">
-    <rect x="204" y="222" rx="14" ry="14" width="146" height="30" fill="#122019" stroke="#2a5a44"/>
-    <text x="277" y="242" fill="#8ff0bf">SQLite local</text>
-    <rect x="366" y="222" rx="14" ry="14" width="208" height="30" fill="#122019" stroke="#2a5a44"/>
-    <text x="470" y="242" fill="#8ff0bf">Zero infraestrutura</text>
-    <rect x="590" y="222" rx="14" ry="14" width="246" height="30" fill="#122019" stroke="#2a5a44"/>
-    <text x="713" y="242" fill="#8ff0bf">Dashboard em tempo real</text>
-  </g>
-
-  <defs>
-    <!-- Gradient para garantir o efeito bonito de cauda/fade se estiver usando stroke="url(#stroke)" -->
-    <linearGradient id="stroke" x1="0%" y1="0%" x2="100%" y2="0%">
-      <stop offset="0%" stop-color="#42c98a" stop-opacity="0.2"/>
-      <stop offset="100%" stop-color="#42c98a" stop-opacity="1"/>
-    </linearGradient>
-  </defs>
-
-  <!-- Linha do ECG -->
-  <path id="ecg-path" 
-        d="M0 320 H760 L796 320 L820 262 L852 350 L884 288 L912 320 H1280"
-        fill="none" 
-        stroke="url(#stroke)" 
-        stroke-width="3" 
-        stroke-linejoin="round"
-        stroke-linecap="round"
-        stroke-dasharray="1280"
-        stroke-dashoffset="1280">
-    <animate 
-      attributeName="stroke-dashoffset" 
-      values="1280; 0; -1280" 
-      dur="2.4s" 
-      repeatCount="indefinite" 
-      keyTimes="0; 0.75; 1"
-      calcMode="linear" />
-  </path>
-
-  <!-- Bolinha e Efeito de Glow sincronizados -->
-  <g>
-    <!-- Ponto Central Sólido -->
-    <circle cx="0" cy="0" r="4.5" fill="#42c98a" />
-    
-    <!-- Pulso Externo da Bolinha -->
-    <circle cx="0" cy="0" r="4.5" fill="#42c98a" opacity="0.6">
-      <animate attributeName="r" values="4.5;14;4.5" dur="1.2s" repeatCount="indefinite"/>
-      <animate attributeName="opacity" values="0.7;0;0.7" dur="1.2s" repeatCount="indefinite"/>
-    </circle>
-
-    <!-- Animação de Movimento Alinhada -->
-    <animateMotion 
-      dur="2.4s" 
-      repeatCount="indefinite" 
-      keyPoints="0; 1; 1" 
-      keyTimes="0; 0.75; 1" 
-      calcMode="linear">
-      <mpath href="#ecg-path"/>
-    </animateMotion>
-
-    <!-- Esconde a bolinha durante a pausa entre os batimentos para não flutuar no final -->
-    <animate 
-      attributeName="opacity" 
-      values="1; 1; 0; 0" 
-      keyTimes="0; 0.74; 0.75; 1" 
-      dur="2.4s" 
-      repeatCount="indefinite" />
+  <g class="sans" font-size="16" fill="#565068">
+    <circle cx="78" cy="295" r="5" fill="#2e7d5b"/>
+    <text x="92" y="301">Sem infraestrutura</text>
+    <circle cx="262" cy="295" r="5" fill="#4f5b93"/>
+    <text x="276" y="301">Dashboard embutido</text>
+    <circle cx="456" cy="295" r="5" fill="#c8102e"/>
+    <text x="470" y="301">PHP 8.1+ e Laravel 9+</text>
   </g>
 </svg>

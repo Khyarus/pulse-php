@@ -23,7 +23,11 @@ final class Pulse
         'requests' => [],
         'queries' => [],
         'outbound_requests' => [],
+        'logs' => [],
+        'deploys' => [],
     ];
+
+    private const MAX_LOG_MESSAGE_LENGTH = 2000;
 
     private const DEFAULT_OPTIONS = [
         // Fraction (0.0–1.0) of requests whose request/query/span/outbound
@@ -46,7 +50,7 @@ final class Pulse
     private array $buffer = self::EMPTY_BUFFER;
     private int $bufferedRecords = 0;
 
-    /** @var array<string, array{started_at: int, memory: int, service: string, route: string, trace_id: string}> */
+    /** @var array<string, array{started_at: int, memory: int, service: string, route: string, trace_id: string, offset_ms: float|null}> */
     private array $timers = [];
 
     /** @var array{sample_rate: float, ignore_paths: list<string>, max_buffer_size: int, retention_days: int, prune_lottery: array{int, int}} */
@@ -58,6 +62,7 @@ final class Pulse
     private string $route = '/';
     private string $method = '';
     private string $traceId = '';
+    private int $traceStartedAt = 0;
     private bool $recording = true;
 
     /** @param array<string, mixed> $options */
@@ -186,6 +191,7 @@ final class Pulse
         $this->route = trim($route) !== '' ? trim($route) : '/';
         $this->method = strtoupper(trim($method));
         $this->traceId = bin2hex(random_bytes(8));
+        $this->traceStartedAt = hrtime(true);
         $this->recording = !$this->isIgnoredPath($path ?? $this->route) && $this->sampled();
 
         return $this->traceId;
@@ -250,6 +256,7 @@ final class Pulse
             'service' => $this->service,
             'route' => $this->route,
             'trace_id' => $this->traceId,
+            'offset_ms' => $this->elapsedMs(),
         ];
     }
 
@@ -273,6 +280,7 @@ final class Pulse
             'service' => $timer['service'],
             'route' => $timer['route'],
             'trace_id' => $timer['trace_id'],
+            'offset_ms' => $timer['trace_id'] === $this->traceId ? $timer['offset_ms'] : null,
         ]);
     }
 
@@ -336,6 +344,7 @@ final class Pulse
             'service' => $this->service,
             'route' => $this->route,
             'trace_id' => $this->traceId,
+            'offset_ms' => $this->elapsedMs($durationMs),
         ]);
     }
 
@@ -352,6 +361,7 @@ final class Pulse
         $parts = parse_url($url);
         $host = is_array($parts) ? strtolower((string) ($parts['host'] ?? 'unknown')) : 'unknown';
         $safeUrl = $this->sanitizeOutboundUrl($parts);
+        $offsetMs = $this->elapsedMs($durationMs);
 
         $this->push('spans', [
             'name' => 'http.outbound:' . $host,
@@ -360,6 +370,7 @@ final class Pulse
             'service' => $this->service,
             'route' => $this->route,
             'trace_id' => $this->traceId,
+            'offset_ms' => $offsetMs,
         ]);
         $this->push('outbound_requests', [
             'service' => $this->service,
@@ -369,7 +380,43 @@ final class Pulse
             'url' => $safeUrl,
             'duration_ms' => max(0.0, $durationMs),
             'trace_id' => $this->traceId,
+            'offset_ms' => $offsetMs,
         ]);
+    }
+
+    /**
+     * Records a log line correlated with the current trace. Like exceptions,
+     * logs are kept regardless of sampling.
+     *
+     * @param array<string, mixed> $context
+     */
+    public function recordLog(string $level, string $message, array $context = []): void
+    {
+        if (strlen($message) > self::MAX_LOG_MESSAGE_LENGTH) {
+            $message = substr($message, 0, self::MAX_LOG_MESSAGE_LENGTH) . '…';
+        }
+
+        $this->push('logs', [
+            'level' => strtolower($level),
+            'message' => $message,
+            'context' => self::normalizeContext($context),
+            'service' => $this->service,
+            'route' => $this->route,
+            'trace_id' => $this->traceId,
+        ]);
+    }
+
+    /**
+     * Marks a deploy. The dashboard draws it on the charts so regressions can
+     * be tied to a release. Written immediately.
+     */
+    public function deploy(string $version, ?string $service = null): void
+    {
+        $this->push('deploys', [
+            'version' => trim($version) !== '' ? trim($version) : 'unknown',
+            'service' => $service !== null ? $this->cleanService($service) : $this->service,
+        ]);
+        $this->writeBuffer();
     }
 
     /**
@@ -432,6 +479,40 @@ final class Pulse
         } catch (Throwable $exception) {
             $this->report('Unable to prune old telemetry.', $exception);
         }
+    }
+
+    /**
+     * Keeps log context small and serializable: objects become their class
+     * name, nesting stops at three levels and long strings are cut.
+     *
+     * @param array<mixed> $context
+     * @return array<mixed>
+     */
+    private static function normalizeContext(array $context, int $depth = 0): array
+    {
+        $normalized = [];
+        foreach (array_slice($context, 0, 50, true) as $key => $value) {
+            $normalized[$key] = match (true) {
+                is_array($value) => $depth >= 2 ? '[array]' : self::normalizeContext($value, $depth + 1),
+                $value instanceof Throwable => $value::class . ': ' . $value->getMessage(),
+                is_object($value) => '[' . $value::class . ']',
+                is_string($value) && strlen($value) > 500 => substr($value, 0, 500) . '…',
+                is_resource($value) => '[resource]',
+                default => $value,
+            };
+        }
+
+        return $normalized;
+    }
+
+    /** Milliseconds since the trace began, minus $durationMs (start of the operation). */
+    private function elapsedMs(float $durationMs = 0.0): ?float
+    {
+        if ($this->traceStartedAt === 0) {
+            return null;
+        }
+
+        return max(0.0, (hrtime(true) - $this->traceStartedAt) / 1_000_000 - $durationMs);
     }
 
     private function sampled(): bool
