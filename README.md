@@ -19,8 +19,8 @@
 
 <!-- BADGES -->
 <p align="center">
-  <a href="https://github.com/jgcansi/pulse-php/releases"><img src="https://img.shields.io/badge/versão-1.0.0-3aa0ff?style=for-the-badge" alt="Versão"></a>
-  <a href="https://github.com/jgcansi/pulse-php/actions/workflows/tests.yml"><img src="https://img.shields.io/badge/testes-passing-42c98a?style=for-the-badge" alt="Testes"></a>
+  <a href="https://github.com/Khyarus/pulse-php/releases"><img src="https://img.shields.io/badge/versão-1.0.1-3aa0ff?style=for-the-badge" alt="Versão"></a>
+  <a href="https://github.com/Khyarus/pulse-php/actions/workflows/tests.yml"><img src="https://img.shields.io/badge/testes-passing-42c98a?style=for-the-badge" alt="Testes"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/licença-MIT-42c98a?style=for-the-badge" alt="Licença"></a>
 </p>
 
@@ -36,7 +36,7 @@
   <a href="#-demonstração-em-ação"><img src="https://img.shields.io/badge/▶_Ver_Demo-42c98a?style=for-the-badge" alt="Ver demo"></a>
     <a href="#-instalação"><img src="https://img.shields.io/badge/⚙_Instalação-3aa0ff?style=for-the-badge" alt="Instalação"></a>
   <a href="#-uso"><img src="https://img.shields.io/badge/📚_Documentação-555?style=for-the-badge" alt="Documentação"></a>
-  <a href="https://github.com/jgcansi/pulse-php/discussions"><img src="https://img.shields.io/badge/💬_Discussões-5865F2?style=for-the-badge" alt="Discussões"></a>
+  <a href="https://github.com/Khyarus/pulse-php/discussions"><img src="https://img.shields.io/badge/💬_Discussões-5865F2?style=for-the-badge" alt="Discussões"></a>
 </p>
 
 <p align="center">
@@ -469,7 +469,7 @@ OK (59 tests, 321 assertions)
 - [ ] Exportação de traces em formato OpenTelemetry
 - [ ] Captura de comandos Artisan agendados
 
-Veja os [issues abertos](https://github.com/jgcansi/pulse-php/issues) para o plano completo.
+Veja os [issues abertos](https://github.com/Khyarus/pulse-php/issues) para o plano completo.
 
 ---
 
@@ -479,7 +479,7 @@ Contribuições são muito bem-vindas! Abra uma *issue* para discutir ideias ou 
 
 ```bash
 # Fork -> branch -> commit -> pull request
-git clone https://github.com/jgcansi/pulse-php.git
+git clone https://github.com/Khyarus/pulse-php.git
 cd pulse-php
 composer install
 git checkout -b feat/minha-feature
@@ -498,13 +498,13 @@ git push origin feat/minha-feature
 
 Distribuído sob a **Licença MIT**. Veja [`LICENSE`](LICENSE) para detalhes.
 
-Criado e mantido por **[João Gabriel Cansi Silveira](https://github.com/jgcansi)**.
+Criado e mantido por **[João Gabriel Cansi Silveira](https://github.com/Khyarus)**.
 
 <div align="center">
 
 <p align="center">
-  <a href="https://github.com/jgcansi/pulse-php/stargazers">
-    <img src="https://img.shields.io/github/stars/jgcansi/pulse-php?style=social" alt="Stars">
+  <a href="https://github.com/Khyarus/pulse-php/stargazers">
+    <img src="https://img.shields.io/github/stars/Khyarus/pulse-php?style=social" alt="Stars">
   </a>
 </p>
 

@@ -41,6 +41,14 @@ As versões do PulsePHP seguem o formato **`MAJOR.MINOR.PATCH`**, com um sufixo 
 
 ---
 
+## [1.0.1] - 2026-10-13
+
+### Corrigido
+- Links do GitHub (`composer.json`, README, CHANGELOG, guias e templates de issue) apontavam para `github.com/jgcansi/pulse-php`, que não existe. Agora apontam para `github.com/Khyarus/pulse-php`. O nome do pacote no Composer continua `jgcansi/pulse-php`.
+- Ilustração do terminal no README mostrava a instalação da versão beta.
+
+---
+
 ## [1.0.0] - 2026-10-13
 
 Primeira versão **estável**. A API pública segue SemVer a partir daqui.
@@ -123,6 +131,7 @@ composer require jgcansi/pulse-php:^1.0@beta
 
 ---
 
-[Unreleased]: https://github.com/jgcansi/pulse-php/compare/v1.0.0...HEAD
-[1.0.0]: https://github.com/jgcansi/pulse-php/compare/v1.0.0-beta.1...v1.0.0
-[1.0.0-beta.1]: https://github.com/jgcansi/pulse-php/releases/tag/v1.0.0-beta.1
+[Unreleased]: https://github.com/Khyarus/pulse-php/compare/v1.0.1...HEAD
+[1.0.1]: https://github.com/Khyarus/pulse-php/compare/v1.0.0...v1.0.1
+[1.0.0]: https://github.com/Khyarus/pulse-php/compare/v1.0.0-beta.1...v1.0.0
+[1.0.0-beta.1]: https://github.com/Khyarus/pulse-php/releases/tag/v1.0.0-beta.1

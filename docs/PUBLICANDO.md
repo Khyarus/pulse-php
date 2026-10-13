@@ -43,7 +43,7 @@ Verifique o `composer.json`:
 3. Cole a URL do repositório no campo **Repository URL**:
 
    ```
-   https://github.com/jgcansi/pulse-php
+   https://github.com/Khyarus/pulse-php
    ```
 
 4. Clique em **Check**. O Packagist lê o `composer.json`, apresenta o nome do pacote e verifica se ele já existe.
@@ -64,7 +64,7 @@ composer require jgcansi/pulse-php
 Para que o Packagist atualize sozinho sempre que você der `push` de uma nova tag/commit, configure o webhook:
 
 1. No **GitHub**, vá em: **Settings → Webhooks → Add webhook**
-   (`https://github.com/jgcansi/pulse-php/settings/hooks`).
+   (`https://github.com/Khyarus/pulse-php/settings/hooks`).
 2. **Payload URL** (pegue a sua URL de API no Packagist, exibida em **Profile → Show API Token**):
 
    ```

@@ -8,7 +8,7 @@ assignees: []
 
 <!--
   Antes de abrir esta issue, pesquise nas issues existentes para evitar duplicatas:
-  https://github.com/jgcansi/pulse-php/issues
+  https://github.com/Khyarus/pulse-php/issues
   Considere também conferir o Roadmap no README.
 -->
 

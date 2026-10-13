@@ -14,7 +14,7 @@ Ao participar deste projeto, você concorda em manter um ambiente respeitoso, ac
 
 ## 🐛 Reportando Bugs
 
-Antes de abrir uma issue, **pesquise as [issues existentes](https://github.com/jgcansi/pulse-php/issues)** para evitar duplicatas.
+Antes de abrir uma issue, **pesquise as [issues existentes](https://github.com/Khyarus/pulse-php/issues)** para evitar duplicatas.
 
 Use o template [**Bug Report**](.github/ISSUE_TEMPLATE/bug_report.md) e inclua:
 
@@ -53,7 +53,7 @@ git clone https://github.com/<seu-usuario>/pulse-php.git
 cd pulse-php
 
 # 2. Adicione o repositório oficial como upstream
-git remote add upstream https://github.com/jgcansi/pulse-php.git
+git remote add upstream https://github.com/Khyarus/pulse-php.git
 
 # 3. Sincronize a branch main
 git checkout main
